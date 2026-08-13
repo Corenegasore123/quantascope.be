@@ -11,6 +11,7 @@ import { documentsRouter } from "./modules/documents/documents.routes.js";
 import { dashboardRouter } from "./modules/dashboard/dashboard.routes.js";
 import { notificationsRouter } from "./modules/notifications/notifications.routes.js";
 import { projectMembersRouter } from "./modules/projects/members.routes.js";
+import { adminRouter } from "./modules/admin/admin.routes.js";
 import { errorHandler } from "./middleware/error.js";
 
 export const app = express();
@@ -31,22 +32,9 @@ app.get("/health", (_req, res) => {
 
 app.get("/api/ready", async (_req, res) => {
   try {
-    const { prisma } = await import("./lib/db.js");
-    const { checkRedisConnection, isRedisEnabled } = await import(
-      "./infrastructure/redis/connection.js"
-    );
-    const { checkCVServiceHealth } = await import("./modules/vision/vision.service.js");
-    await prisma.$queryRaw`SELECT 1`;
-    const redis = isRedisEnabled() ? await checkRedisConnection() : null;
-    const cv = await checkCVServiceHealth();
-    const ready = (redis === null || redis === true) && cv;
-    res.status(ready ? 200 : 503).json({
-      status: ready ? "ready" : "degraded",
-      database: "ok",
-      redis: isRedisEnabled() ? (redis ? "ok" : "error") : "disabled",
-      queue: isRedisEnabled() ? (redis ? "ok" : "unavailable") : "inline",
-      cvService: cv ? "ok" : "error",
-    });
+    const { getSystemHealth } = await import("./lib/system-health.js");
+    const health = await getSystemHealth();
+    res.status(health.status === "ready" ? 200 : 503).json(health);
   } catch {
     res.status(503).json({ status: "not_ready", database: "error" });
   }
@@ -62,5 +50,6 @@ app.use("/api/documents", documentsRouter);
 app.use("/api/calculations", calculationsRouter);
 app.use("/api/images", imagesRouter);
 app.use("/api/calculation-rules", calculationRulesRouter);
+app.use("/api/admin", adminRouter);
 
 app.use(errorHandler);
