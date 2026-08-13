@@ -11,7 +11,7 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.scripts.json",
     "test:engine": "npm run test --workspace=packages/calculation-engine",
     "db:generate": "node scripts/with-database-url.mjs generate",
     "db:push": "node scripts/with-database-url.mjs db push",
@@ -26,13 +26,13 @@
   },
   "dependencies": {
     "@auto-measure/calculation-engine": "*",
-    "@prisma/client": "^6.1.0",
+    "@prisma/client": "^6.19.3",
     "bcryptjs": "^2.4.3",
+    "bullmq": "^5.34.8",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
-    "bullmq": "^5.34.8",
     "ioredis": "^5.4.2",
     "multer": "^1.4.5-lts.1",
     "zod": "^3.24.1"
@@ -44,7 +44,7 @@
     "@types/express": "^5.0.0",
     "@types/multer": "^1.4.12",
     "@types/node": "^22.10.2",
-    "prisma": "^6.1.0",
+    "prisma": "^6.19.3",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2"
   },
