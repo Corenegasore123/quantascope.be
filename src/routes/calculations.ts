@@ -6,7 +6,12 @@ import { createCalculationFromUpload } from "../lib/pipeline.js";
 import { saveFile } from "../lib/storage.js";
 import { generateTextPdf } from "../lib/pdf-report.js";
 import {
+  applyReportTemplate,
   buildCalculationReport,
+  buildComparisonView,
+  loadJobForReport,
+  parseReportTemplate,
+  reportComparisonCsvContent,
   reportCsvContent,
   reportPdfSections,
 } from "../lib/report-builder.js";
@@ -287,36 +292,47 @@ router.get("/:id/result", async (req, res, next) => {
   }
 });
 
+router.get("/:id/compare", async (req, res, next) => {
+  try {
+    const job = await assertJobAccess(req.user!.id, req.params.id);
+    const full = await loadJobForReport(job.id);
+    if (!full) throw new AppError(404, "Calculation not found");
+
+    const comparison = buildComparisonView(full);
+    const format = (req.query.format as string) ?? "json";
+
+    if (format === "csv") {
+      const csv = reportComparisonCsvContent(comparison);
+      res.setHeader("Content-Type", "text/csv");
+      res.setHeader("Content-Disposition", `attachment; filename="comparison-${job.id}.csv"`);
+      res.send(csv);
+      return;
+    }
+
+    res.json(comparison);
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.get("/:id/report", async (req, res, next) => {
   try {
     const job = await assertJobAccess(req.user!.id, req.params.id);
-    const full = await prisma.calculationJob.findUnique({
-      where: { id: job.id },
-      include: {
-        image: true,
-        measurements: true,
-        variables: true,
-        steps: { orderBy: { stepOrder: "asc" } },
-        result: true,
-        revisions: { orderBy: { version: "desc" } },
-        scenarios: {
-          include: { result: { select: { result: true, unit: true } } },
-        },
-        parentJob: { select: { id: true, scenarioName: true, version: true } },
-      },
-    });
+    const full = await loadJobForReport(job.id);
 
     if (!full) throw new AppError(404, "Calculation not found");
 
     const format = (req.query.format as string) ?? "json";
+    const template = parseReportTemplate(req.query.template as string | undefined);
     const report = buildCalculationReport(full);
+    const output = applyReportTemplate(report, template);
 
     if (format === "json") {
-      const filename = `report-${full.id}.json`;
-      const buffer = Buffer.from(JSON.stringify(report, null, 2));
+      const filename = `report-${full.id}-${template}.json`;
+      const buffer = Buffer.from(JSON.stringify(output, null, 2));
       await saveFile("reports", filename, buffer);
       await prisma.report.create({
-        data: { jobId: full.id, format: "json", storagePath: filename },
+        data: { jobId: full.id, format: `json-${template}`, storagePath: filename },
       });
       res.setHeader("Content-Type", "application/json");
       res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
@@ -325,20 +341,26 @@ router.get("/:id/report", async (req, res, next) => {
     }
 
     if (format === "csv") {
-      const csv = reportCsvContent(report);
+      const csv = reportCsvContent(report, template);
       res.setHeader("Content-Type", "text/csv");
-      res.setHeader("Content-Disposition", `attachment; filename="report-${full.id}.csv"`);
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="report-${full.id}-${template}.csv"`
+      );
       res.send(csv);
       return;
     }
 
     if (format === "pdf") {
-      const sections = reportPdfSections(report);
-      const pdfBuffer = generateTextPdf(`QuantScope Report — ${full.image.filename}`, sections);
-      const filename = `report-${full.id}.pdf`;
+      const sections = reportPdfSections(report, template);
+      const pdfBuffer = generateTextPdf(
+        `QuantScope Report — ${full.image.filename}`,
+        sections
+      );
+      const filename = `report-${full.id}-${template}.pdf`;
       await saveFile("reports", filename, pdfBuffer);
       await prisma.report.create({
-        data: { jobId: full.id, format: "pdf", storagePath: filename },
+        data: { jobId: full.id, format: `pdf-${template}`, storagePath: filename },
       });
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
@@ -346,7 +368,7 @@ router.get("/:id/report", async (req, res, next) => {
       return;
     }
 
-    res.json(report);
+    res.json(output);
   } catch (error) {
     next(error);
   }

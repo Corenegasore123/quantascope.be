@@ -9,6 +9,13 @@ import {
   accessibleProjectsWhere,
   getProjectMembership,
 } from "./access.js";
+import {
+  buildCalculationReport,
+  jobReportInclude,
+  parseReportTemplate,
+  reportBatchCsvContent,
+} from "../../lib/report-builder.js";
+import { generateTextPdf } from "../../lib/pdf-report.js";
 
 export const projectsRouter = Router();
 
@@ -171,6 +178,68 @@ projectsRouter.get("/:id/activity", async (req, res, next) => {
     });
 
     res.json({ activity });
+  } catch (error) {
+    next(error);
+  }
+});
+
+projectsRouter.get("/:id/report", async (req, res, next) => {
+  try {
+    const projectId = req.params.id;
+    const membership = await assertProjectAccess(req.user!.id, projectId);
+    const format = (req.query.format as string) ?? "csv";
+    const template = parseReportTemplate(req.query.template as string | undefined);
+
+    const jobs = await prisma.calculationJob.findMany({
+      where: { projectId, parentJobId: null, status: "COMPLETED" },
+      orderBy: { createdAt: "desc" },
+      include: jobReportInclude,
+    });
+
+    if (jobs.length === 0) {
+      throw new AppError(404, "No completed calculations to export", "NOT_FOUND");
+    }
+
+    const reports = jobs.map(buildCalculationReport);
+
+    if (format === "json") {
+      res.setHeader("Content-Type", "application/json");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="project-${projectId}-report.json"`
+      );
+      res.send(JSON.stringify({ project: membership.project.name, reports }, null, 2));
+      return;
+    }
+
+    if (format === "pdf") {
+      const sections = reports.flatMap((r, i) => [
+        {
+          heading: `${i + 1}. ${r.image.filename}`,
+          lines: [
+            `Result: ${r.calculation.result?.result ?? "—"} ${r.calculation.result?.unit ?? ""}`,
+            `Version: ${r.metadata.version}`,
+            `Confidence: ${r.confidence ? `${(r.confidence * 100).toFixed(0)}%` : "—"}`,
+          ],
+        },
+      ]);
+      const pdf = generateTextPdf(`Project Report — ${membership.project.name}`, sections);
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="project-${projectId}-report.pdf"`
+      );
+      res.send(pdf);
+      return;
+    }
+
+    const csv = reportBatchCsvContent(reports, template);
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="project-${projectId}-report.csv"`
+    );
+    res.send(csv);
   } catch (error) {
     next(error);
   }
