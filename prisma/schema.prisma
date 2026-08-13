@@ -1,0 +1,121 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Image {
+  id           String   @id @default(uuid())
+  filename     String
+  mimeType     String
+  sizeBytes    Int
+  storagePath  String
+  width        Int?
+  height       Int?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  calculations CalculationJob[]
+}
+
+model CalculationJob {
+  id              String              @id @default(uuid())
+  imageId         String
+  image           Image               @relation(fields: [imageId], references: [id])
+  status          JobStatus           @default(UPLOADING)
+  workItem        String?
+  method          String?
+  errorMessage    String?
+  overallConfidence Float?
+  methodologyVersion String           @default("1.0.0")
+  softwareVersion String              @default("1.0.0")
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  completedAt     DateTime?
+  measurements    DetectedMeasurement[]
+  variables       Variable[]
+  result          CalculationResult?
+  steps           CalculationStep[]
+  reports         Report[]
+}
+
+enum JobStatus {
+  UPLOADING
+  PROCESSING_IMAGE
+  EXTRACTING_MEASUREMENTS
+  INTERPRETING_DIAGRAM
+  VALIDATING
+  CALCULATING
+  COMPLETED
+  FAILED
+}
+
+model DetectedMeasurement {
+  id              String         @id @default(uuid())
+  jobId           String
+  job             CalculationJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  value           Float
+  unit            String
+  rawText         String
+  confidence      Float
+  boundingBox     Json
+  label           String?
+  normalizedValue Float?
+  normalizedUnit  String?
+  createdAt       DateTime       @default(now())
+  variables       Variable[]
+}
+
+model Variable {
+  id              String              @id @default(uuid())
+  jobId           String
+  job             CalculationJob      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  name            String
+  value           Float
+  unit            String
+  confidence      Float
+  measurementId   String?
+  measurement     DetectedMeasurement? @relation(fields: [measurementId], references: [id])
+  createdAt       DateTime            @default(now())
+}
+
+model CalculationResult {
+  id              String         @id @default(uuid())
+  jobId           String         @unique
+  job             CalculationJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  ruleId          String
+  ruleName        String
+  formula         String
+  formulaLatex    String
+  result          Float
+  unit            String
+  inputs          Json
+  intermediateResults Json?
+  validation      Json
+  createdAt       DateTime       @default(now())
+}
+
+model CalculationStep {
+  id          String         @id @default(uuid())
+  jobId       String
+  job         CalculationJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  stepOrder   Int
+  ruleId      String
+  ruleName    String
+  formula     String
+  inputs      Json
+  result      Float
+  unit        String
+  createdAt   DateTime       @default(now())
+}
+
+model Report {
+  id          String         @id @default(uuid())
+  jobId       String
+  job         CalculationJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  format      String
+  storagePath String
+  createdAt   DateTime       @default(now())
+}

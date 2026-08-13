@@ -1,0 +1,2 @@
+# Root Python dependencies (scripts + cv-service shared)
+-r services/cv-service/requirements.txt

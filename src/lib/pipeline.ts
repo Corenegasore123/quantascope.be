@@ -1,0 +1,251 @@
+import { prisma } from "./db.js";
+import { saveFile } from "./storage.js";
+import { overallConfidence } from "./confidence.js";
+import {
+  executeRule,
+  getRuleById,
+  normalizeToMetres,
+  type MappedVariable,
+} from "@auto-measure/calculation-engine";
+import {
+  mapMeasurementsToVariables,
+  selectCalculationPlan,
+  type RawMeasurement,
+} from "./variable-mapper.js";
+
+const CV_SERVICE_URL = process.env.CV_SERVICE_URL ?? "http://localhost:8000";
+
+interface CVMeasurement {
+  id: string;
+  value: number;
+  unit: string;
+  raw_text: string;
+  confidence: number;
+  bounding_box: { x: number; y: number; width: number; height: number };
+  label?: string | null;
+}
+
+interface CVResponse {
+  measurements: CVMeasurement[];
+  warnings: string[];
+}
+
+async function updateStatus(jobId: string, status: string) {
+  await prisma.calculationJob.update({
+    where: { id: jobId },
+    data: { status: status as never },
+  });
+}
+
+async function callCVService(imageBuffer: Buffer, filename: string, imageId: string): Promise<CVResponse> {
+  const formData = new FormData();
+  const blob = new Blob([new Uint8Array(imageBuffer)]);
+  formData.append("file", blob, filename);
+
+  const response = await fetch(`${CV_SERVICE_URL}/process?image_id=${imageId}`, {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`CV service error: ${response.status} ${text}`);
+  }
+
+  return response.json() as Promise<CVResponse>;
+}
+
+export async function processCalculationJob(jobId: string): Promise<void> {
+  try {
+    const job = await prisma.calculationJob.findUnique({
+      where: { id: jobId },
+      include: { image: true },
+    });
+    if (!job) throw new Error("Job not found");
+
+    await updateStatus(jobId, "PROCESSING_IMAGE");
+
+    const { readStoredFile } = await import("./storage.js");
+    const imageBuffer = await readStoredFile(job.image.storagePath);
+
+    await updateStatus(jobId, "EXTRACTING_MEASUREMENTS");
+    let cvResult: CVResponse;
+
+    try {
+      cvResult = await callCVService(imageBuffer, job.image.filename, job.imageId);
+    } catch (err) {
+      if (process.env.CV_OCR_PROVIDER === "mock" || process.env.ALLOW_MOCK_CV === "true") {
+        cvResult = { measurements: [], warnings: ["CV service unavailable, using empty result"] };
+      } else {
+        throw new Error(`Unable to process image: ${err instanceof Error ? err.message : "unknown"}`);
+      }
+    }
+
+    if (cvResult.measurements.length === 0) {
+      await prisma.calculationJob.update({
+        where: { id: jobId },
+        data: {
+          status: "FAILED",
+          errorMessage: "No measurements detected in the uploaded image",
+        },
+      });
+      return;
+    }
+
+    const rawMeasurements: RawMeasurement[] = cvResult.measurements.map((m) => ({
+      id: m.id,
+      value: m.value,
+      unit: m.unit,
+      rawText: m.raw_text,
+      confidence: m.confidence,
+      boundingBox: m.bounding_box,
+      label: m.label ?? undefined,
+    }));
+
+    for (const m of rawMeasurements) {
+      await prisma.detectedMeasurement.create({
+        data: {
+          id: m.id,
+          jobId,
+          value: m.value,
+          unit: m.unit,
+          rawText: m.rawText,
+          confidence: m.confidence,
+          boundingBox: m.boundingBox,
+          label: m.label,
+          normalizedValue: normalizeToMetres(m.value, m.unit),
+          normalizedUnit: "m",
+        },
+      });
+    }
+
+    await updateStatus(jobId, "INTERPRETING_DIAGRAM");
+    const mapping = mapMeasurementsToVariables(rawMeasurements);
+
+    for (const [name, variable] of Object.entries(mapping.variables) as Array<
+      [string, MappedVariable]
+    >) {
+      await prisma.variable.create({
+        data: {
+          jobId,
+          name,
+          value: variable.value,
+          unit: variable.unit,
+          confidence: variable.confidence,
+          measurementId: variable.sourceMeasurementId,
+        },
+      });
+    }
+
+    await updateStatus(jobId, "VALIDATING");
+    const plan = selectCalculationPlan(mapping);
+
+    if (!plan) {
+      await prisma.calculationJob.update({
+        where: { id: jobId },
+        data: {
+          status: "FAILED",
+          errorMessage: "Insufficient measurements to perform calculation. Required: external length, width, and depth.",
+        },
+      });
+      return;
+    }
+
+    await updateStatus(jobId, "CALCULATING");
+    const context: Record<string, number> = {};
+    let finalResult = 0;
+    let finalUnit = "cum";
+    let stepOrder = 0;
+
+    for (const step of plan.steps) {
+      const rule = getRuleById(step.ruleId);
+      if (!rule) continue;
+
+      const mergedInputs = { ...context, ...step.inputs };
+      const result = executeRule(rule, mergedInputs);
+
+      await prisma.calculationStep.create({
+        data: {
+          jobId,
+          stepOrder: stepOrder++,
+          ruleId: rule.id,
+          ruleName: rule.name,
+          formula: rule.formula.expression,
+          inputs: mergedInputs,
+          result: result.result,
+          unit: result.unit,
+        },
+      });
+
+      if (!Number.isNaN(result.result)) {
+        finalResult = result.result;
+        finalUnit = result.unit;
+      }
+    }
+
+    const confidences = rawMeasurements.map((m) => m.confidence);
+    const confidence = overallConfidence(confidences);
+
+    await prisma.calculationResult.create({
+      data: {
+        jobId,
+        ruleId: plan.steps[plan.steps.length - 1].ruleId,
+        ruleName: "Earthwork Excavation Quantity",
+        formula: getRuleById(plan.steps[plan.steps.length - 1].ruleId)?.formula.expression ?? "",
+        formulaLatex: getRuleById(plan.steps[plan.steps.length - 1].ruleId)?.formula.latex ?? "",
+        result: finalResult,
+        unit: finalUnit,
+        inputs: mapping.variables as object,
+        validation: { status: "valid", warnings: cvResult.warnings },
+      },
+    });
+
+    await prisma.calculationJob.update({
+      where: { id: jobId },
+      data: {
+        status: "COMPLETED",
+        workItem: plan.workItem,
+        method: plan.method,
+        overallConfidence: confidence,
+        completedAt: new Date(),
+      },
+    });
+  } catch (error) {
+    await prisma.calculationJob.update({
+      where: { id: jobId },
+      data: {
+        status: "FAILED",
+        errorMessage: error instanceof Error ? error.message : "Processing failed",
+      },
+    });
+  }
+}
+
+export async function createCalculationFromUpload(
+  filename: string,
+  mimeType: string,
+  buffer: Buffer
+): Promise<string> {
+  const imageId = crypto.randomUUID();
+  const storagePath = await saveFile("images", `${imageId}-${filename}`, buffer);
+
+  const image = await prisma.image.create({
+    data: {
+      id: imageId,
+      filename,
+      mimeType,
+      sizeBytes: buffer.length,
+      storagePath,
+    },
+  });
+
+  const job = await prisma.calculationJob.create({
+    data: {
+      imageId: image.id,
+      status: "UPLOADING",
+    },
+  });
+
+  processCalculationJob(job.id).catch(console.error);
+  return job.id;
+}

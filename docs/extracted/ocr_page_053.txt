@@ -1,0 +1,69 @@
+116 ESTIMATING AND COSTING
+
+Item| Particulars of Height
+No. | items and details No. | Length |Breadth} or |Quantity| Explanatory notes
+of works Depth
+m m m
+
+5. | Ist class brick-work 1
+in | : 6 cement
+mortar in
+super-structure —
+Adjoining rooms
+combined —
+Long walls
+Short walls
+Inter 20 cm
+wail coef 1 3.60 | 0.20 | 3.50 2.52 | Ht. up to bottom of slab.
+Square room in
+| between verandah —
+
+9.50 | 0.30 | 3.62 | 20.63 | Ht. up to top of slab.
+3.60 | 0.30 | 3.62 7.82 | Ht. up to top of slab.
+
+NN
+
+Long wall (outer) 4.20 | 0.30 | 3.62 4.56 | L = 3.90 + .30=4.20m
+
+Short walls...) 2 | 3.60 | 0.30 | 3.62 7.82 | L = 3.90 - 30 = 3.60m
+Verandah pillars 2 0.30 | 0.30 | 2.80 0.50
+Verandah 20 cm
+wall above lintel—
+Long wall
+__(front and back) | 2 | 3.60] 0.20 | 0.30 0.43
+Short wall front
+
+(side) vel 1 1.70 | 0.20 | 0.30 0.10
+Short wall back
+
+(side) vee} 2.40 | 0.20 | 0.30 0.14
+Parapet —
+
+Adjoining rooms — Ht. of parapet = .39 +
+
+Outer long wall (out .08 + .03 = 0.50 m
+
+to out) 1 9.50 | 0.20 | 0.50 0.95 |L=9.20 + .30=9.50 m
+
+Short walls | 2 | 4.00] 0.20 | 0.50 0.80 | L=3.60 + .30 + .10=4.00 m
+
+Front verandah side | 1 2.40 | 0.20 | 0.50 0.24 | L = 1.80 + .60=2.40m «
+
+Back verandah side | 1 2.50 | 0.20 | 0.50 0.25 | L = 2.50 + .20 - 0.20 =
+2.50 m
+
+Square room-outer
+
+wall mess! 4.20 | 0.20 | 0.50 | 0.42 |L=3.60+ .60=4.20m
+
+Walls in between
+
+ver.androom ...| 2 | 3.90; 0.20 | 0.50 0.78 | L=3.60 + .20 + .10=3.90 m
+
+Total | 47.96
+
+cum
+
+Note.— Parapet is only on the outer main walls of rooms. Parapet may. be taken in one
+operation by finding the total length of walls = 34.40 x 0.20 x 0.50 = 3.44 cu m.
+

@@ -1,0 +1,52 @@
+40cm
+4
+som
+
+SECTION-PQ
+
+Doors
+
+D,-1.20 x 2.00m
+D,-0.90 x 1.80 m
+Windows
+
+W,-1,00 x 1.20m
+W,0.75 x 0.90 m
+Shetf-1.00 x 1.50m
+Steps
+
+Treads-30 om
+
+Rise 15.cm
+
+osoem
+
+A ap Fe
+A295 m |
+I
+
+at Le.
+20cm
+
+PLAN
+
+SITE OFFICE BLOCK
+
+Room 6.00 x 3-60 m
+|°
+
+|
+fl:
+
+Verandah
+3.40 x 250m
+
+Bath W.C.
+2.50 x 2.60m
+
+30cm
+
+Fig. 3-19
+CHOWKHATS — DOORS = 8 x 12cm, WINDOWS = 8 x 10 cm,
+
+157

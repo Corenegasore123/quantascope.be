@@ -1,0 +1,43 @@
+ESTIMATE OF A SIX ROOMED BUILDING 21
+
+Example 7.—Estimate the quantities of the following items of work of the six-roomed
+building from the given drawings, Figs. 3-8 and 3-9:—
+
+(1) Earthwork in excavation in foundation, (2) Earthwork in filling in plinth, (3) Lime concrete
+in foundation, (4) First class brickwork in 1:6 cement sand mortar in foundation and plinth, (5)2.5
+cm Damp proof course, (6) First class brickwork in lime mortar in superstructure, (7) R.C.C. work,
+in roof slab, beam, lintel, sun shade, etc. excluding steel, (8) Steel work in reinforcement in R.C.C.
+work, (9) Lime concrete terracing in roof, and (10) Bitumen insulation layer in roof.
+
+SIX ROOMED BUILDING e
+WITH FRONT AND BACK VERANDAHS AND SIDF ROOMS CROSS-SECTION
+7.5 em L.C. Terracing ove
+
+2.5 em C.C. over 7.5 cm L.C.
+SECTION ON PQRS DETAIL OF VER. PILLAR
+Fig, 3-8 =
+Centre to centre length of walls —
+30 cin walls —
+Total centre to centre length of left side rooms and right side rooms
+=2 [24.5 + 5.0 + .2 + .3) + 2(4.0 + .30)] = 2[20.0 + 8.6] =.57.20 m
+Total centre to centre length of central rooms
+= 24.5445 + .2+ .3)=2%9.5 = 19.00 m
+Total centre to centre length of all 30:cm wails
+= 57.20 + 19.00 = 76.20 m
+Number of junctions = 4 (junctions with 30 cm walls).
+20 cm walls — ,
+Total centre to centre length of 20,cm partition walls in rooms
+= 2 4.30 + 6.30 = 14.90 m
+Number of junctions —6 (junctions with 30 cm walls).
+Total centre length of 20 cm walls of back side rooms
+= 2(2 x 2.75"+ 2.70) = 16.40 m
+Number of junctions = 4 (junctions with 30 cm walls).
+Centre to centre Jength of front verandah = 9.50 m
+Centre to centre length of back verandah
+= (4.04+4.54+4.5+4.0+4 x 30+ 20) — (2 « 2:90) + .20 = 12.80 m
+Parapet — Parapet is-only over the outer main walls of rooms.
+Total centre length of parapets =
+Left and right side lengths + back side length + front side lengths
+2™ 10.1 +18.2 +2 4.4 + 9.40 + 2 x 3.70 = 64.00 m
+Note. — In this example items 1,3,4,5 and 6 have been estimated by centre line method in the
+following pages.
