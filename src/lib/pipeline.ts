@@ -1,5 +1,5 @@
 import { prisma } from "./db.js";
-import { saveFile } from "./storage.js";
+import { getStorage } from "../infrastructure/storage/local.storage.js";
 import { overallConfidence } from "./confidence.js";
 import {
   executeRule,
@@ -28,6 +28,13 @@ interface CVMeasurement {
 interface CVResponse {
   measurements: CVMeasurement[];
   warnings: string[];
+}
+
+async function updateDocumentStatus(imageId: string, status: string) {
+  await prisma.image.update({
+    where: { id: imageId },
+    data: { status: status as never },
+  });
 }
 
 async function updateStatus(jobId: string, status: string) {
@@ -63,6 +70,7 @@ export async function processCalculationJob(jobId: string): Promise<void> {
     });
     if (!job) throw new Error("Job not found");
 
+    await updateDocumentStatus(job.imageId, "PROCESSING");
     await updateStatus(jobId, "PROCESSING_IMAGE");
 
     const { readStoredFile } = await import("./storage.js");
@@ -82,6 +90,7 @@ export async function processCalculationJob(jobId: string): Promise<void> {
     }
 
     if (cvResult.measurements.length === 0) {
+      await updateDocumentStatus(job.imageId, "FAILED");
       await prisma.calculationJob.update({
         where: { id: jobId },
         data: {
@@ -141,6 +150,7 @@ export async function processCalculationJob(jobId: string): Promise<void> {
     const plan = selectCalculationPlan(mapping);
 
     if (!plan) {
+      await updateDocumentStatus(job.imageId, "FAILED");
       await prisma.calculationJob.update({
         where: { id: jobId },
         data: {
@@ -210,7 +220,11 @@ export async function processCalculationJob(jobId: string): Promise<void> {
         completedAt: new Date(),
       },
     });
+
+    await updateDocumentStatus(job.imageId, "PROCESSED");
   } catch (error) {
+    const job = await prisma.calculationJob.findUnique({ where: { id: jobId } });
+    if (job) await updateDocumentStatus(job.imageId, "FAILED");
     await prisma.calculationJob.update({
       where: { id: jobId },
       data: {
@@ -224,27 +238,51 @@ export async function processCalculationJob(jobId: string): Promise<void> {
 export async function createCalculationFromUpload(
   filename: string,
   mimeType: string,
-  buffer: Buffer
+  buffer: Buffer,
+  context: { userId: string; projectId?: string; existingImageId?: string }
 ): Promise<string> {
-  const imageId = crypto.randomUUID();
-  const storagePath = await saveFile("images", `${imageId}-${filename}`, buffer);
+  const storage = getStorage();
+  let imageId: string;
 
-  const image = await prisma.image.create({
-    data: {
-      id: imageId,
-      filename,
-      mimeType,
-      sizeBytes: buffer.length,
-      storagePath,
-    },
-  });
+  if (context.existingImageId) {
+    imageId = context.existingImageId;
+    await prisma.image.update({
+      where: { id: imageId },
+      data: { status: "UPLOADED" },
+    });
+  } else {
+    imageId = crypto.randomUUID();
+    const storagePath = await storage.save("images", `${imageId}-${filename}`, buffer);
+
+    await prisma.image.create({
+      data: {
+        id: imageId,
+        filename,
+        mimeType,
+        sizeBytes: buffer.length,
+        storagePath,
+        status: "UPLOADED",
+        uploadedById: context.userId,
+        projectId: context.projectId,
+      },
+    });
+  }
 
   const job = await prisma.calculationJob.create({
     data: {
-      imageId: image.id,
+      imageId,
+      userId: context.userId,
+      projectId: context.projectId,
       status: "UPLOADING",
     },
   });
+
+  if (context.projectId) {
+    await prisma.project.update({
+      where: { id: context.projectId },
+      data: { updatedAt: new Date() },
+    });
+  }
 
   processCalculationJob(job.id).catch(console.error);
   return job.id;

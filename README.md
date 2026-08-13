@@ -18,7 +18,17 @@ pip install -r requirements.txt
 cp .env.example .env              # configure DB_* credentials
 npm run db:generate
 npm run db:push
+npm run seed                  # optional dev admin user
 ```
+
+## Auth (Milestone 1)
+
+- Register / login / logout via `/api/auth/*`
+- Session cookie: `quantscope_session` (httpOnly)
+- All calculation and image routes require authentication
+- Dev admin after seed: `admin@quantscope.local` / `Admin123!`
+
+See [docs/authentication.md](./docs/authentication.md).
 
 ## Run
 
@@ -39,4 +49,5 @@ API: http://localhost:4000/health
 |---------|-------------|
 | `npm run dev` | Start API with hot reload |
 | `npm run db:push` | Sync database schema |
+| `npm run seed` | Create dev admin user |
 | `npm run test:engine` | Run calculation engine tests |

@@ -7,42 +7,140 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ─── Identity (Milestone 1) ─────────────────────────────────────────────────
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+model User {
+  id              String    @id @default(uuid())
+  name            String
+  email           String    @unique
+  passwordHash    String
+  role            UserRole  @default(USER)
+  profileImage    String?
+  timezone        String    @default("UTC")
+  language        String    @default("en")
+  emailVerifiedAt DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  sessions        Session[]
+  projects        Project[]
+  images          Image[]
+  calculationJobs CalculationJob[]
+  auditLogs       AuditLog[]
+
+  @@index([email])
+}
+
+model Session {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
+  expiresAt DateTime
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+// ─── Projects (Milestone 2-ready schema, basic CRUD in M1) ─────────────────
+
+enum ProjectStatus {
+  ACTIVE
+  COMPLETED
+  ARCHIVED
+}
+
+model Project {
+  id          String        @id @default(uuid())
+  name        String
+  description String?
+  ownerId     String
+  owner       User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  status      ProjectStatus @default(ACTIVE)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  images          Image[]
+  calculationJobs CalculationJob[]
+
+  @@index([ownerId])
+  @@index([status])
+}
+
+// ─── Documents & Analysis ───────────────────────────────────────────────────
+
+enum DocumentStatus {
+  UPLOADING
+  UPLOADED
+  PROCESSING
+  PROCESSED
+  FAILED
+}
+
 model Image {
-  id           String   @id @default(uuid())
+  id           String         @id @default(uuid())
   filename     String
   mimeType     String
   sizeBytes    Int
   storagePath  String
+  status       DocumentStatus @default(UPLOADING)
   width        Int?
   height       Int?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  uploadedById String?
+  uploadedBy   User?          @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+  projectId    String?
+  project      Project?       @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
   calculations CalculationJob[]
+
+  @@index([uploadedById])
+  @@index([projectId])
+  @@index([status])
 }
 
 model CalculationJob {
-  id              String              @id @default(uuid())
-  imageId         String
-  image           Image               @relation(fields: [imageId], references: [id])
-  status          JobStatus           @default(UPLOADING)
-  workItem        String?
-  method          String?
-  errorMessage    String?
-  overallConfidence Float?
-  methodologyVersion String           @default("1.0.0")
-  softwareVersion String              @default("1.0.0")
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
-  completedAt     DateTime?
-  measurements    DetectedMeasurement[]
-  variables       Variable[]
-  result          CalculationResult?
-  steps           CalculationStep[]
-  reports         Report[]
+  id                 String              @id @default(uuid())
+  imageId            String
+  image              Image               @relation(fields: [imageId], references: [id])
+  userId             String?
+  user               User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
+  projectId          String?
+  project            Project?            @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  status             JobStatus           @default(UPLOADING)
+  workItem           String?
+  method             String?
+  errorMessage       String?
+  overallConfidence  Float?
+  methodologyVersion String              @default("1.0.0")
+  softwareVersion    String              @default("1.0.0")
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  completedAt        DateTime?
+  measurements       DetectedMeasurement[]
+  variables          Variable[]
+  result             CalculationResult?
+  steps              CalculationStep[]
+  reports            Report[]
+
+  @@index([userId])
+  @@index([projectId])
+  @@index([status])
+  @@index([createdAt])
 }
 
 enum JobStatus {
   UPLOADING
+  QUEUED
+  PROCESSING
   PROCESSING_IMAGE
   EXTRACTING_MEASUREMENTS
   INTERPRETING_DIAGRAM
@@ -69,46 +167,46 @@ model DetectedMeasurement {
 }
 
 model Variable {
-  id              String              @id @default(uuid())
-  jobId           String
-  job             CalculationJob      @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  name            String
-  value           Float
-  unit            String
-  confidence      Float
-  measurementId   String?
-  measurement     DetectedMeasurement? @relation(fields: [measurementId], references: [id])
-  createdAt       DateTime            @default(now())
+  id            String              @id @default(uuid())
+  jobId         String
+  job           CalculationJob      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  name          String
+  value         Float
+  unit          String
+  confidence    Float
+  measurementId String?
+  measurement   DetectedMeasurement? @relation(fields: [measurementId], references: [id])
+  createdAt     DateTime            @default(now())
 }
 
 model CalculationResult {
-  id              String         @id @default(uuid())
-  jobId           String         @unique
-  job             CalculationJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  ruleId          String
-  ruleName        String
-  formula         String
-  formulaLatex    String
-  result          Float
-  unit            String
-  inputs          Json
+  id                  String         @id @default(uuid())
+  jobId               String         @unique
+  job                 CalculationJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  ruleId              String
+  ruleName            String
+  formula             String
+  formulaLatex        String
+  result              Float
+  unit                String
+  inputs              Json
   intermediateResults Json?
-  validation      Json
-  createdAt       DateTime       @default(now())
+  validation          Json
+  createdAt           DateTime       @default(now())
 }
 
 model CalculationStep {
-  id          String         @id @default(uuid())
-  jobId       String
-  job         CalculationJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  stepOrder   Int
-  ruleId      String
-  ruleName    String
-  formula     String
-  inputs      Json
-  result      Float
-  unit        String
-  createdAt   DateTime       @default(now())
+  id        String         @id @default(uuid())
+  jobId     String
+  job       CalculationJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  stepOrder Int
+  ruleId    String
+  ruleName  String
+  formula   String
+  inputs    Json
+  result    Float
+  unit      String
+  createdAt DateTime       @default(now())
 }
 
 model Report {
@@ -118,4 +216,21 @@ model Report {
   format      String
   storagePath String
   createdAt   DateTime       @default(now())
+}
+
+// ─── Audit (append-only application log) ────────────────────────────────────
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action    String
+  resource  String?
+  metadata  Json?
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
 }
