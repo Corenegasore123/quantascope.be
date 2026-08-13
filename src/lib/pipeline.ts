@@ -210,6 +210,26 @@ export async function processCalculationJob(jobId: string): Promise<void> {
       status: "COMPLETED",
       at: new Date().toISOString(),
     });
+
+    const { notifyCalculationComplete } = await import(
+      "../modules/notifications/notification.service.js"
+    );
+    await notifyCalculationComplete(
+      jobId,
+      job.userId,
+      job.image.filename,
+      job.projectId,
+      validationSummary.status === "needs_review"
+    );
+
+    await prisma.auditLog.create({
+      data: {
+        userId: job.userId,
+        action: "calculation.completed",
+        resource: job.projectId ? `project:${job.projectId}` : `job:${jobId}`,
+        metadata: { jobId, needsReview: validationSummary.status === "needs_review" },
+      },
+    });
   } catch (error) {
     const job = await prisma.calculationJob.findUnique({ where: { id: jobId } });
     const msg = error instanceof Error ? error.message : "Processing failed";

@@ -29,6 +29,8 @@ model User {
 
   sessions        Session[]
   projects        Project[]
+  projectMembers  ProjectMember[]
+  notifications   Notification[]
   images          Image[]
   calculationJobs CalculationJob[]
   auditLogs       AuditLog[]
@@ -70,6 +72,7 @@ model Project {
 
   images          Image[]
   calculationJobs CalculationJob[]
+  members         ProjectMember[]
 
   @@index([ownerId])
   @@index([status])
@@ -260,5 +263,51 @@ model AuditLog {
 
   @@index([userId])
   @@index([action])
+  @@index([createdAt])
+}
+
+// ─── Collaboration (Phase 7) ────────────────────────────────────────────────
+
+enum ProjectMemberRole {
+  EDITOR
+  VIEWER
+}
+
+model ProjectMember {
+  id          String            @id @default(uuid())
+  projectId   String
+  project     Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role        ProjectMemberRole
+  invitedById String?
+  createdAt   DateTime          @default(now())
+
+  @@unique([projectId, userId])
+  @@index([userId])
+  @@index([projectId])
+}
+
+enum NotificationType {
+  PROJECT_INVITE
+  CALCULATION_COMPLETED
+  CALCULATION_NEEDS_REVIEW
+  MEMBER_ADDED
+  MEMBER_REMOVED
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType
+  title     String
+  body      String?
+  link      String?
+  read      Boolean          @default(false)
+  metadata  Json?
+  createdAt DateTime         @default(now())
+
+  @@index([userId, read])
   @@index([createdAt])
 }

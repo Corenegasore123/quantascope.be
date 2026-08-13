@@ -6,6 +6,7 @@ import { createCalculationFromUpload } from "../../lib/pipeline.js";
 import { getStorage } from "../../infrastructure/storage/local.storage.js";
 import { requireAuth } from "../../middleware/auth.js";
 import { AppError } from "../../shared/errors.js";
+import { assertProjectAccess } from "../projects/access.js";
 
 export const documentsRouter = Router();
 
@@ -83,10 +84,16 @@ documentsRouter.post("/:id/upload", upload.single("file"), async (req, res, next
 documentsRouter.delete("/:id", async (req, res, next) => {
   try {
     const docId = String(req.params.id);
-    const doc = await prisma.image.findFirst({
-      where: { id: docId, uploadedById: req.user!.id },
-    });
+    const doc = await prisma.image.findFirst({ where: { id: docId } });
     if (!doc) throw new AppError(404, "Document not found", "NOT_FOUND");
+
+    if (doc.uploadedById === req.user!.id) {
+      // owner of upload can delete
+    } else if (doc.projectId) {
+      await assertProjectAccess(req.user!.id, doc.projectId, "EDITOR");
+    } else {
+      throw new AppError(404, "Document not found", "NOT_FOUND");
+    }
 
     const storage = getStorage();
     await storage.delete(doc.storagePath);

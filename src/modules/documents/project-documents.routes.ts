@@ -63,7 +63,7 @@ projectDocumentsRouter.get("/", async (req, res, next) => {
 projectDocumentsRouter.post("/intent", async (req, res, next) => {
   try {
     const projectId = pid(req);
-    await assertProjectAccess(req.user!.id, projectId);
+    await assertProjectAccess(req.user!.id, projectId, "EDITOR");
 
     const body = intentSchema.parse(req.body);
     validateMime(body.mimeType);
@@ -97,7 +97,7 @@ projectDocumentsRouter.post("/intent", async (req, res, next) => {
 projectDocumentsRouter.post("/", upload.single("file"), async (req, res, next) => {
   try {
     const projectId = pid(req);
-    await assertProjectAccess(req.user!.id, projectId);
+    await assertProjectAccess(req.user!.id, projectId, "EDITOR");
 
     const file = req.file;
     if (!file) throw new AppError(400, "No file uploaded");

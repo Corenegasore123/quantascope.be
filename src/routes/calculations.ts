@@ -11,14 +11,14 @@ import {
   reportPdfSections,
 } from "../lib/report-builder.js";
 import { requireAuth } from "../middleware/auth.js";
-import { assertJobAccess } from "../modules/calculations/access.js";
+import { assertJobAccess, assertJobEditAccess } from "../modules/calculations/access.js";
 import {
   runDeterministicCalculation,
   correctVariable,
   correctMeasurement,
   createScenario,
 } from "../modules/calculations/recalculate.service.js";
-import { getDefaultProjectId } from "../modules/projects/access.js";
+import { getDefaultProjectId, accessibleJobsWhere } from "../modules/projects/access.js";
 import { AppError } from "../shared/errors.js";
 
 const router = Router();
@@ -36,12 +36,13 @@ const upload = multer({
 router.get("/", async (req, res, next) => {
   try {
     const jobs = await prisma.calculationJob.findMany({
-      where: { userId: req.user!.id },
+      where: { ...(await accessibleJobsWhere(req.user!.id)), parentJobId: null },
       orderBy: { createdAt: "desc" },
       take: 50,
       include: {
         image: { select: { filename: true } },
         result: { select: { result: true, unit: true } },
+        project: { select: { id: true, name: true } },
       },
     });
     res.json(jobs);
@@ -153,7 +154,7 @@ router.get("/:id/scenarios", async (req, res, next) => {
   try {
     await assertJobAccess(req.user!.id, String(req.params.id));
     const scenarios = await prisma.calculationJob.findMany({
-      where: { parentJobId: String(req.params.id), userId: req.user!.id },
+      where: { parentJobId: String(req.params.id) },
       orderBy: { createdAt: "desc" },
       include: { result: { select: { result: true, unit: true } } },
     });
@@ -165,7 +166,7 @@ router.get("/:id/scenarios", async (req, res, next) => {
 
 router.post("/:id/recalculate", async (req, res, next) => {
   try {
-    await assertJobAccess(req.user!.id, String(req.params.id));
+    await assertJobEditAccess(req.user!.id, String(req.params.id));
     const result = await runDeterministicCalculation(String(req.params.id), req.user!.id);
     res.json(result);
   } catch (error) {
@@ -175,7 +176,7 @@ router.post("/:id/recalculate", async (req, res, next) => {
 
 router.post("/:id/scenarios", async (req, res, next) => {
   try {
-    await assertJobAccess(req.user!.id, String(req.params.id));
+    await assertJobEditAccess(req.user!.id, String(req.params.id));
     const body = z
       .object({
         name: z.string().min(1).max(120),
@@ -199,7 +200,7 @@ router.post("/:id/scenarios", async (req, res, next) => {
 
 router.patch("/:id/variables/:name", async (req, res, next) => {
   try {
-    await assertJobAccess(req.user!.id, String(req.params.id));
+    await assertJobEditAccess(req.user!.id, String(req.params.id));
     const body = z
       .object({ value: z.number(), unit: z.string().default("m") })
       .parse(req.body);
@@ -219,7 +220,7 @@ router.patch("/:id/variables/:name", async (req, res, next) => {
 
 router.patch("/:id/measurements/:measurementId", async (req, res, next) => {
   try {
-    await assertJobAccess(req.user!.id, String(req.params.id));
+    await assertJobEditAccess(req.user!.id, String(req.params.id));
     const body = z
       .object({ value: z.number(), unit: z.string().default("m") })
       .parse(req.body);

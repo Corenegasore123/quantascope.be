@@ -3,7 +3,12 @@ import { z } from "zod";
 import { prisma } from "../../lib/db.js";
 import { requireAuth } from "../../middleware/auth.js";
 import { AppError } from "../../shared/errors.js";
-import { assertProjectAccess } from "./access.js";
+import {
+  assertProjectAccess,
+  accessibleJobsWhere,
+  accessibleProjectsWhere,
+  getProjectMembership,
+} from "./access.js";
 
 export const projectsRouter = Router();
 
@@ -22,14 +27,28 @@ const updateSchema = z.object({
 
 projectsRouter.get("/", async (req, res, next) => {
   try {
+    const userId = req.user!.id;
     const projects = await prisma.project.findMany({
-      where: { ownerId: req.user!.id },
+      where: accessibleProjectsWhere(userId),
       orderBy: { updatedAt: "desc" },
       include: {
-        _count: { select: { calculationJobs: true, images: true } },
+        owner: { select: { id: true, name: true } },
+        _count: { select: { calculationJobs: true, images: true, members: true } },
       },
     });
-    res.json({ projects });
+
+    const withRole = await Promise.all(
+      projects.map(async (p) => {
+        const membership = await getProjectMembership(userId, p.id);
+        return {
+          ...p,
+          role: membership?.role ?? "VIEWER",
+          isOwner: p.ownerId === userId,
+        };
+      })
+    );
+
+    res.json({ projects: withRole });
   } catch (error) {
     next(error);
   }
@@ -54,7 +73,7 @@ projectsRouter.post("/", async (req, res, next) => {
       },
     });
 
-    res.status(201).json({ project });
+    res.status(201).json({ project: { ...project, role: "OWNER", isOwner: true } });
   } catch (error) {
     next(error);
   }
@@ -62,14 +81,22 @@ projectsRouter.post("/", async (req, res, next) => {
 
 projectsRouter.get("/:id", async (req, res, next) => {
   try {
-    const project = await prisma.project.findFirst({
-      where: { id: req.params.id, ownerId: req.user!.id },
+    const membership = await assertProjectAccess(req.user!.id, req.params.id);
+    const project = await prisma.project.findUnique({
+      where: { id: req.params.id },
       include: {
-        _count: { select: { calculationJobs: true, images: true } },
+        owner: { select: { id: true, name: true, email: true } },
+        _count: { select: { calculationJobs: true, images: true, members: true } },
       },
     });
     if (!project) throw new AppError(404, "Project not found", "NOT_FOUND");
-    res.json({ project });
+    res.json({
+      project: {
+        ...project,
+        role: membership.role,
+        isOwner: membership.role === "OWNER",
+      },
+    });
   } catch (error) {
     next(error);
   }
@@ -77,7 +104,7 @@ projectsRouter.get("/:id", async (req, res, next) => {
 
 projectsRouter.patch("/:id", async (req, res, next) => {
   try {
-    await assertProjectAccess(req.user!.id, req.params.id);
+    await assertProjectAccess(req.user!.id, req.params.id, "OWNER");
     const body = updateSchema.parse(req.body);
 
     const project = await prisma.project.update({
@@ -94,7 +121,7 @@ projectsRouter.patch("/:id", async (req, res, next) => {
       },
     });
 
-    res.json({ project });
+    res.json({ project: { ...project, role: "OWNER", isOwner: true } });
   } catch (error) {
     next(error);
   }
@@ -105,11 +132,12 @@ projectsRouter.get("/:id/calculations", async (req, res, next) => {
     await assertProjectAccess(req.user!.id, req.params.id);
 
     const calculations = await prisma.calculationJob.findMany({
-      where: { projectId: req.params.id, userId: req.user!.id },
+      where: { projectId: req.params.id, parentJobId: null },
       orderBy: { createdAt: "desc" },
       include: {
         image: { select: { id: true, filename: true, status: true } },
         result: { select: { result: true, unit: true } },
+        user: { select: { id: true, name: true } },
       },
     });
 
@@ -124,9 +152,18 @@ projectsRouter.get("/:id/activity", async (req, res, next) => {
     const projectId = req.params.id;
     await assertProjectAccess(req.user!.id, projectId);
 
+    const jobIds = await prisma.calculationJob.findMany({
+      where: { projectId },
+      select: { id: true },
+    });
+    const jobResources = jobIds.map((j) => `job:${j.id}`);
+
     const activity = await prisma.auditLog.findMany({
       where: {
-        resource: { startsWith: `project:${projectId}` },
+        OR: [
+          { resource: { startsWith: `project:${projectId}` } },
+          ...(jobResources.length ? [{ resource: { in: jobResources } }] : []),
+        ],
       },
       orderBy: { createdAt: "desc" },
       take: 50,

@@ -9,6 +9,8 @@ import { projectsRouter } from "./modules/projects/projects.routes.js";
 import { projectDocumentsRouter } from "./modules/documents/project-documents.routes.js";
 import { documentsRouter } from "./modules/documents/documents.routes.js";
 import { dashboardRouter } from "./modules/dashboard/dashboard.routes.js";
+import { notificationsRouter } from "./modules/notifications/notifications.routes.js";
+import { projectMembersRouter } from "./modules/projects/members.routes.js";
 import { errorHandler } from "./middleware/error.js";
 
 export const app = express();
@@ -52,7 +54,9 @@ app.get("/api/ready", async (_req, res) => {
 
 app.use("/api/auth", authRouter);
 app.use("/api/dashboard", dashboardRouter);
+app.use("/api/notifications", notificationsRouter);
 app.use("/api/projects", projectsRouter);
+app.use("/api/projects/:id/members", projectMembersRouter);
 app.use("/api/projects/:projectId/documents", projectDocumentsRouter);
 app.use("/api/documents", documentsRouter);
 app.use("/api/calculations", calculationsRouter);

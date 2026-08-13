@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { prisma } from "../../lib/db.js";
 import { requireAuth } from "../../middleware/auth.js";
+import { accessibleProjectsWhere, accessibleJobsWhere } from "../projects/access.js";
 
 export const dashboardRouter = Router();
 
@@ -9,17 +10,21 @@ dashboardRouter.use(requireAuth);
 dashboardRouter.get("/", async (req, res, next) => {
   try {
     const userId = req.user!.id;
+    const jobsWhere = await accessibleJobsWhere(userId);
 
     const [projects, recentJobs, recentDocuments, stats, needsReviewCount, needsReviewJobs, correctedCount] =
       await Promise.all([
         prisma.project.findMany({
-          where: { ownerId: userId },
+          where: accessibleProjectsWhere(userId),
           orderBy: { updatedAt: "desc" },
           take: 5,
-          include: { _count: { select: { calculationJobs: true, images: true } } },
+          include: {
+            owner: { select: { name: true } },
+            _count: { select: { calculationJobs: true, images: true } },
+          },
         }),
         prisma.calculationJob.findMany({
-          where: { userId, parentJobId: null },
+          where: { ...jobsWhere, parentJobId: null },
           orderBy: { createdAt: "desc" },
           take: 8,
           include: {
@@ -29,31 +34,37 @@ dashboardRouter.get("/", async (req, res, next) => {
           },
         }),
         prisma.image.findMany({
-          where: { uploadedById: userId },
+          where: {
+            OR: [{ uploadedById: userId }, { project: accessibleProjectsWhere(userId) }],
+          },
           orderBy: { createdAt: "desc" },
           take: 6,
           include: { project: { select: { id: true, name: true } } },
         }),
         prisma.$transaction([
-          prisma.project.count({ where: { ownerId: userId } }),
-          prisma.calculationJob.count({ where: { userId } }),
-          prisma.calculationJob.count({ where: { userId, status: "COMPLETED" } }),
+          prisma.project.count({ where: accessibleProjectsWhere(userId) }),
+          prisma.calculationJob.count({ where: jobsWhere }),
+          prisma.calculationJob.count({ where: { ...jobsWhere, status: "COMPLETED" } }),
           prisma.calculationJob.count({
-            where: { userId, status: { notIn: ["COMPLETED", "FAILED"] } },
+            where: { ...jobsWhere, status: { notIn: ["COMPLETED", "FAILED"] } },
           }),
-          prisma.image.count({ where: { uploadedById: userId } }),
-          prisma.calculationJob.count({ where: { userId, version: { gt: 1 } } }),
+          prisma.image.count({
+            where: {
+              OR: [{ uploadedById: userId }, { project: accessibleProjectsWhere(userId) }],
+            },
+          }),
+          prisma.calculationJob.count({ where: { ...jobsWhere, version: { gt: 1 } } }),
         ]),
         prisma.calculationJob.count({
           where: {
-            userId,
+            ...jobsWhere,
             status: "COMPLETED",
             result: { validation: { path: ["status"], equals: "needs_review" } },
           },
         }),
         prisma.calculationJob.findMany({
           where: {
-            userId,
+            ...jobsWhere,
             status: "COMPLETED",
             result: { validation: { path: ["status"], equals: "needs_review" } },
           },
@@ -64,7 +75,7 @@ dashboardRouter.get("/", async (req, res, next) => {
           },
         }),
         prisma.detectedMeasurement.count({
-          where: { userCorrected: true, job: { userId } },
+          where: { userCorrected: true, job: jobsWhere },
         }),
       ]);
 
