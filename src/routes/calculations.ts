@@ -5,6 +5,11 @@ import { prisma } from "../lib/db.js";
 import { createCalculationFromUpload } from "../lib/pipeline.js";
 import { saveFile } from "../lib/storage.js";
 import { generateTextPdf } from "../lib/pdf-report.js";
+import {
+  buildCalculationReport,
+  reportCsvContent,
+  reportPdfSections,
+} from "../lib/report-builder.js";
 import { requireAuth } from "../middleware/auth.js";
 import { assertJobAccess } from "../modules/calculations/access.js";
 import {
@@ -292,33 +297,18 @@ router.get("/:id/report", async (req, res, next) => {
         variables: true,
         steps: { orderBy: { stepOrder: "asc" } },
         result: true,
+        revisions: { orderBy: { version: "desc" } },
+        scenarios: {
+          include: { result: { select: { result: true, unit: true } } },
+        },
+        parentJob: { select: { id: true, scenarioName: true, version: true } },
       },
     });
 
     if (!full) throw new AppError(404, "Calculation not found");
 
     const format = (req.query.format as string) ?? "json";
-
-    const report = {
-      metadata: {
-        jobId: full.id,
-        timestamp: full.completedAt ?? full.createdAt,
-        softwareVersion: full.softwareVersion,
-        methodologyVersion: full.methodologyVersion,
-        status: full.status,
-      },
-      image: { filename: full.image.filename, mimeType: full.image.mimeType },
-      measurements: full.measurements,
-      variables: full.variables,
-      calculation: {
-        workItem: full.workItem,
-        method: full.method,
-        steps: full.steps,
-        result: full.result,
-      },
-      confidence: full.overallConfidence,
-      validation: full.result?.validation,
-    };
+    const report = buildCalculationReport(full);
 
     if (format === "json") {
       const filename = `report-${full.id}.json`;
@@ -334,14 +324,7 @@ router.get("/:id/report", async (req, res, next) => {
     }
 
     if (format === "csv") {
-      const rows = [
-        ["Variable", "Value", "Unit", "Confidence"],
-        ...full.variables.map((v) => [v.name, v.value, v.unit, v.confidence]),
-        [],
-        ["Step", "Rule", "Result", "Unit"],
-        ...full.steps.map((s) => [s.stepOrder + 1, s.ruleName, s.result, s.unit]),
-      ];
-      const csv = rows.map((r) => r.join(",")).join("\n");
+      const csv = reportCsvContent(report);
       res.setHeader("Content-Type", "text/csv");
       res.setHeader("Content-Disposition", `attachment; filename="report-${full.id}.csv"`);
       res.send(csv);
@@ -349,44 +332,7 @@ router.get("/:id/report", async (req, res, next) => {
     }
 
     if (format === "pdf") {
-      const sections = [
-        {
-          heading: "Metadata",
-          lines: [
-            `Job ID: ${full.id}`,
-            `Status: ${full.status}`,
-            `Software version: ${full.softwareVersion}`,
-            `Methodology version: ${full.methodologyVersion}`,
-            `Timestamp: ${(full.completedAt ?? full.createdAt).toISOString()}`,
-          ],
-        },
-        {
-          heading: "Detected Measurements",
-          lines: full.measurements.map(
-            (m) => `${m.rawText}: ${m.value} ${m.unit} (${(m.confidence * 100).toFixed(0)}%)`
-          ),
-        },
-        {
-          heading: "Variables",
-          lines: full.variables.map(
-            (v) => `${v.name}: ${v.value} ${v.unit} (${(v.confidence * 100).toFixed(0)}%)`
-          ),
-        },
-        {
-          heading: "Calculation Steps",
-          lines: full.steps.map(
-            (s) =>
-              `${s.stepOrder + 1}. ${s.ruleName}: ${s.formula} => ${s.result} ${s.unit}`
-          ),
-        },
-        {
-          heading: "Final Result",
-          lines: full.result
-            ? [`${full.result.result} ${full.result.unit}`, `Formula: ${full.result.formula}`]
-            : ["No result available"],
-        },
-      ];
-
+      const sections = reportPdfSections(report);
       const pdfBuffer = generateTextPdf(`QuantScope Report — ${full.image.filename}`, sections);
       const filename = `report-${full.id}.pdf`;
       await saveFile("reports", filename, pdfBuffer);
