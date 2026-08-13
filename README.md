@@ -39,6 +39,12 @@ npm run dev
 # Terminal 2 — CV service
 cd services/cv-service
 ../../.venv/Scripts/python.exe -m uvicorn app.main:app --reload --port 8000
+
+# Terminal 3 — Redis (optional but recommended)
+docker compose up -d
+
+# Terminal 4 — Background worker
+npm run worker:dev
 ```
 
 API: http://localhost:4000/health
@@ -50,4 +56,6 @@ API: http://localhost:4000/health
 | `npm run dev` | Start API with hot reload |
 | `npm run db:push` | Sync database schema |
 | `npm run seed` | Create dev admin user |
+| `npm run worker` | Start analysis worker |
+| `npm run worker:dev` | Worker with hot reload |
 | `npm run test:engine` | Run calculation engine tests |

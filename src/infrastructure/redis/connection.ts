@@ -1,7 +1,7 @@
-import IORedis from "ioredis";
+import { Redis } from "ioredis";
 
-let client: IORedis | null = null;
-let subscriber: IORedis | null = null;
+let client: Redis | null = null;
+let subscriber: Redis | null = null;
 
 export function getRedisUrl(): string {
   return process.env.REDIS_URL ?? "redis://localhost:6379";
@@ -11,9 +11,9 @@ export function isRedisEnabled(): boolean {
   return process.env.REDIS_ENABLED !== "false";
 }
 
-export function getRedis(): IORedis {
+export function getRedis(): Redis {
   if (!client) {
-    client = new IORedis(getRedisUrl(), {
+    client = new Redis(getRedisUrl(), {
       maxRetriesPerRequest: null,
       lazyConnect: true,
     });
@@ -21,9 +21,9 @@ export function getRedis(): IORedis {
   return client;
 }
 
-export function getRedisSubscriber(): IORedis {
+export function getRedisSubscriber(): Redis {
   if (!subscriber) {
-    subscriber = new IORedis(getRedisUrl(), {
+    subscriber = new Redis(getRedisUrl(), {
       maxRetriesPerRequest: null,
       lazyConnect: true,
     });

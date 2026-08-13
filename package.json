@@ -16,7 +16,9 @@
     "db:generate": "node scripts/with-database-url.mjs generate",
     "db:push": "node scripts/with-database-url.mjs db push",
     "db:studio": "node scripts/with-database-url.mjs studio",
-    "seed": "tsx scripts/seed.ts"
+    "seed": "tsx scripts/seed.ts",
+    "worker": "tsx src/worker.ts",
+    "worker:dev": "tsx watch src/worker.ts"
   },
   "prisma": {
     "seed": "tsx scripts/seed.ts"
@@ -29,6 +31,8 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
+    "bullmq": "^5.34.8",
+    "ioredis": "^5.4.2",
     "multer": "^1.4.5-lts.1",
     "zod": "^3.24.1"
   },

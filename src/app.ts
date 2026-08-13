@@ -30,8 +30,18 @@ app.get("/health", (_req, res) => {
 app.get("/api/ready", async (_req, res) => {
   try {
     const { prisma } = await import("./lib/db.js");
+    const { checkRedisConnection, isRedisEnabled } = await import(
+      "./infrastructure/redis/connection.js"
+    );
     await prisma.$queryRaw`SELECT 1`;
-    res.json({ status: "ready", database: "ok" });
+    const redis = isRedisEnabled() ? await checkRedisConnection() : null;
+    const ready = redis === null || redis === true;
+    res.status(ready ? 200 : 503).json({
+      status: ready ? "ready" : "degraded",
+      database: "ok",
+      redis: isRedisEnabled() ? (redis ? "ok" : "error") : "disabled",
+      queue: isRedisEnabled() ? (redis ? "ok" : "unavailable") : "inline",
+    });
   } catch {
     res.status(503).json({ status: "not_ready", database: "error" });
   }

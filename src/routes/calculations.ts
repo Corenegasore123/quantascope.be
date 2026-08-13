@@ -73,6 +73,57 @@ router.post("/", upload.single("file"), async (req, res, next) => {
   }
 });
 
+router.get("/:id/stream", async (req, res, next) => {
+  try {
+    const job = await assertJobAccess(req.user!.id, String(req.params.id));
+
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.flushHeaders();
+
+    const send = (data: object) => {
+      res.write(`data: ${JSON.stringify(data)}\n\n`);
+    };
+
+    send({ status: job.status, at: new Date().toISOString() });
+
+    if (job.status === "COMPLETED" || job.status === "FAILED") {
+      res.end();
+      return;
+    }
+
+    const { isRedisEnabled } = await import("../infrastructure/redis/connection.js");
+
+    if (!isRedisEnabled()) {
+      send({ status: job.status, fallback: "poll" });
+      res.end();
+      return;
+    }
+
+    const { subscribeJobStatus } = await import("../queues/job-events.js");
+    let closed = false;
+
+    const unsub = await subscribeJobStatus(job.id, (payload) => {
+      if (closed) return;
+      send(payload);
+      if (payload.status === "COMPLETED" || payload.status === "FAILED") {
+        closed = true;
+        unsub()
+          .then(() => res.end())
+          .catch(() => res.end());
+      }
+    });
+
+    req.on("close", () => {
+      closed = true;
+      unsub().catch(() => undefined);
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.get("/:id", async (req, res, next) => {
   try {
     const job = await assertJobAccess(req.user!.id, req.params.id);

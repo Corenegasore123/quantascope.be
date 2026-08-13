@@ -19,13 +19,14 @@ export async function publishJobStatus(
 export async function subscribeJobStatus(
   jobId: string,
   onMessage: (payload: JobStatusPayload) => void
-): Promise<() => void> {
+): Promise<() => Promise<void>> {
   const { getRedisSubscriber } = await import("../infrastructure/redis/connection.js");
   const sub = getRedisSubscriber();
   if (sub.status !== "ready") await sub.connect();
 
   const channel = jobChannel(jobId);
-  const handler = (_ch: string, message: string) => {
+  const handler = (ch: string, message: string) => {
+    if (ch !== channel) return;
     try {
       onMessage(JSON.parse(message) as JobStatusPayload);
     } catch {

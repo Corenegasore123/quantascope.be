@@ -1,5 +1,7 @@
 import { prisma } from "./db.js";
 import { getStorage } from "../infrastructure/storage/local.storage.js";
+import { publishJobStatus } from "../queues/job-events.js";
+import { enqueueAnalysisJob } from "../queues/enqueue.js";
 import { overallConfidence } from "./confidence.js";
 import {
   executeRule,
@@ -37,10 +39,28 @@ async function updateDocumentStatus(imageId: string, status: string) {
   });
 }
 
-async function updateStatus(jobId: string, status: string) {
+async function updateStatus(jobId: string, status: string, message?: string) {
   await prisma.calculationJob.update({
     where: { id: jobId },
     data: { status: status as never },
+  });
+  await publishJobStatus(jobId, {
+    status,
+    message,
+    at: new Date().toISOString(),
+  });
+}
+
+async function failJob(jobId: string, imageId: string, errorMessage: string) {
+  await updateDocumentStatus(imageId, "FAILED");
+  await prisma.calculationJob.update({
+    where: { id: jobId },
+    data: { status: "FAILED", errorMessage },
+  });
+  await publishJobStatus(jobId, {
+    status: "FAILED",
+    message: errorMessage,
+    at: new Date().toISOString(),
   });
 }
 
@@ -90,14 +110,7 @@ export async function processCalculationJob(jobId: string): Promise<void> {
     }
 
     if (cvResult.measurements.length === 0) {
-      await updateDocumentStatus(job.imageId, "FAILED");
-      await prisma.calculationJob.update({
-        where: { id: jobId },
-        data: {
-          status: "FAILED",
-          errorMessage: "No measurements detected in the uploaded image",
-        },
-      });
+      await failJob(jobId, job.imageId, "No measurements detected in the uploaded image");
       return;
     }
 
@@ -150,14 +163,11 @@ export async function processCalculationJob(jobId: string): Promise<void> {
     const plan = selectCalculationPlan(mapping);
 
     if (!plan) {
-      await updateDocumentStatus(job.imageId, "FAILED");
-      await prisma.calculationJob.update({
-        where: { id: jobId },
-        data: {
-          status: "FAILED",
-          errorMessage: "Insufficient measurements to perform calculation. Required: external length, width, and depth.",
-        },
-      });
+      await failJob(
+        jobId,
+        job.imageId,
+        "Insufficient measurements to perform calculation. Required: external length, width, and depth."
+      );
       return;
     }
 
@@ -222,16 +232,26 @@ export async function processCalculationJob(jobId: string): Promise<void> {
     });
 
     await updateDocumentStatus(job.imageId, "PROCESSED");
+    await publishJobStatus(jobId, {
+      status: "COMPLETED",
+      at: new Date().toISOString(),
+    });
   } catch (error) {
     const job = await prisma.calculationJob.findUnique({ where: { id: jobId } });
-    if (job) await updateDocumentStatus(job.imageId, "FAILED");
-    await prisma.calculationJob.update({
-      where: { id: jobId },
-      data: {
+    const msg = error instanceof Error ? error.message : "Processing failed";
+    if (job) {
+      await failJob(jobId, job.imageId, msg);
+    } else {
+      await prisma.calculationJob.update({
+        where: { id: jobId },
+        data: { status: "FAILED", errorMessage: msg },
+      });
+      await publishJobStatus(jobId, {
         status: "FAILED",
-        errorMessage: error instanceof Error ? error.message : "Processing failed",
-      },
-    });
+        message: msg,
+        at: new Date().toISOString(),
+      });
+    }
   }
 }
 
@@ -284,6 +304,6 @@ export async function createCalculationFromUpload(
     });
   }
 
-  processCalculationJob(job.id).catch(console.error);
+  await enqueueAnalysisJob(job.id);
   return job.id;
 }
