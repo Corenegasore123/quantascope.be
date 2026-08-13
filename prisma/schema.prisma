@@ -115,6 +115,11 @@ model CalculationJob {
   user               User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
   projectId          String?
   project            Project?            @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  parentJobId        String?
+  parentJob          CalculationJob?     @relation("Scenarios", fields: [parentJobId], references: [id], onDelete: SetNull)
+  scenarios          CalculationJob[]    @relation("Scenarios")
+  scenarioName       String?
+  version            Int                 @default(1)
   status             JobStatus           @default(UPLOADING)
   workItem           String?
   method             String?
@@ -130,9 +135,11 @@ model CalculationJob {
   result             CalculationResult?
   steps              CalculationStep[]
   reports            Report[]
+  revisions          CalculationRevision[]
 
   @@index([userId])
   @@index([projectId])
+  @@index([parentJobId])
   @@index([status])
   @@index([createdAt])
 }
@@ -162,8 +169,29 @@ model DetectedMeasurement {
   label           String?
   normalizedValue Float?
   normalizedUnit  String?
+  userCorrected   Boolean        @default(false)
+  originalValue   Float?
+  originalUnit    String?
   createdAt       DateTime       @default(now())
   variables       Variable[]
+}
+
+model CalculationRevision {
+  id           String         @id @default(uuid())
+  jobId        String
+  job          CalculationJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  version      Int
+  label        String?
+  result       Float
+  unit         String
+  variables    Json
+  measurements Json
+  steps        Json
+  createdById  String?
+  createdAt    DateTime       @default(now())
+
+  @@unique([jobId, version])
+  @@index([jobId])
 }
 
 model Variable {

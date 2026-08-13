@@ -1,11 +1,18 @@
 import { Router } from "express";
 import multer from "multer";
+import { z } from "zod";
 import { prisma } from "../lib/db.js";
 import { createCalculationFromUpload } from "../lib/pipeline.js";
 import { saveFile } from "../lib/storage.js";
 import { generateTextPdf } from "../lib/pdf-report.js";
 import { requireAuth } from "../middleware/auth.js";
 import { assertJobAccess } from "../modules/calculations/access.js";
+import {
+  runDeterministicCalculation,
+  correctVariable,
+  correctMeasurement,
+  createScenario,
+} from "../modules/calculations/recalculate.service.js";
 import { getDefaultProjectId } from "../modules/projects/access.js";
 import { AppError } from "../shared/errors.js";
 
@@ -124,6 +131,107 @@ router.get("/:id/stream", async (req, res, next) => {
   }
 });
 
+router.get("/:id/revisions", async (req, res, next) => {
+  try {
+    await assertJobAccess(req.user!.id, String(req.params.id));
+    const revisions = await prisma.calculationRevision.findMany({
+      where: { jobId: String(req.params.id) },
+      orderBy: { version: "desc" },
+    });
+    res.json({ revisions });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/:id/scenarios", async (req, res, next) => {
+  try {
+    await assertJobAccess(req.user!.id, String(req.params.id));
+    const scenarios = await prisma.calculationJob.findMany({
+      where: { parentJobId: String(req.params.id), userId: req.user!.id },
+      orderBy: { createdAt: "desc" },
+      include: { result: { select: { result: true, unit: true } } },
+    });
+    res.json({ scenarios });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/:id/recalculate", async (req, res, next) => {
+  try {
+    await assertJobAccess(req.user!.id, String(req.params.id));
+    const result = await runDeterministicCalculation(String(req.params.id), req.user!.id);
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/:id/scenarios", async (req, res, next) => {
+  try {
+    await assertJobAccess(req.user!.id, String(req.params.id));
+    const body = z
+      .object({
+        name: z.string().min(1).max(120),
+        overrides: z.record(
+          z.object({ value: z.number(), unit: z.string().optional() })
+        ),
+      })
+      .parse(req.body);
+
+    const scenarioJobId = await createScenario(
+      String(req.params.id),
+      req.user!.id,
+      body.name,
+      body.overrides
+    );
+    res.status(201).json({ jobId: scenarioJobId });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.patch("/:id/variables/:name", async (req, res, next) => {
+  try {
+    await assertJobAccess(req.user!.id, String(req.params.id));
+    const body = z
+      .object({ value: z.number(), unit: z.string().default("m") })
+      .parse(req.body);
+
+    const result = await correctVariable(
+      String(req.params.id),
+      String(req.params.name),
+      req.user!.id,
+      body.value,
+      body.unit
+    );
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.patch("/:id/measurements/:measurementId", async (req, res, next) => {
+  try {
+    await assertJobAccess(req.user!.id, String(req.params.id));
+    const body = z
+      .object({ value: z.number(), unit: z.string().default("m") })
+      .parse(req.body);
+
+    const result = await correctMeasurement(
+      String(req.params.id),
+      String(req.params.measurementId),
+      req.user!.id,
+      body.value,
+      body.unit
+    );
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.get("/:id", async (req, res, next) => {
   try {
     const job = await assertJobAccess(req.user!.id, req.params.id);
@@ -135,6 +243,12 @@ router.get("/:id", async (req, res, next) => {
         variables: { include: { measurement: true } },
         steps: { orderBy: { stepOrder: "asc" } },
         result: true,
+        revisions: { orderBy: { version: "desc" }, take: 10 },
+        scenarios: {
+          orderBy: { createdAt: "desc" },
+          include: { result: { select: { result: true, unit: true } } },
+        },
+        parentJob: { select: { id: true, scenarioName: true, version: true } },
       },
     });
     res.json(full);
