@@ -44,6 +44,7 @@ class ProcessingResult:
     shapes: list[GeometryShape]
     preprocessed: bool
     warnings: list[str] = field(default_factory=list)
+    metadata: dict = field(default_factory=dict)
 
 
 class OCRProvider(ABC):

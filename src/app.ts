@@ -33,14 +33,17 @@ app.get("/api/ready", async (_req, res) => {
     const { checkRedisConnection, isRedisEnabled } = await import(
       "./infrastructure/redis/connection.js"
     );
+    const { checkCVServiceHealth } = await import("./modules/vision/vision.service.js");
     await prisma.$queryRaw`SELECT 1`;
     const redis = isRedisEnabled() ? await checkRedisConnection() : null;
-    const ready = redis === null || redis === true;
+    const cv = await checkCVServiceHealth();
+    const ready = (redis === null || redis === true) && cv;
     res.status(ready ? 200 : 503).json({
       status: ready ? "ready" : "degraded",
       database: "ok",
       redis: isRedisEnabled() ? (redis ? "ok" : "error") : "disabled",
       queue: isRedisEnabled() ? (redis ? "ok" : "unavailable") : "inline",
+      cvService: cv ? "ok" : "error",
     });
   } catch {
     res.status(503).json({ status: "not_ready", database: "error" });

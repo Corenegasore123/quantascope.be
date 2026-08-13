@@ -6,6 +6,7 @@ from pydantic import BaseModel
 
 from app.config import settings
 from app.providers.factory import get_vision_provider
+from app.providers.tesseract_provider import TesseractOCRProvider
 
 app = FastAPI(title=settings.app_name, version=settings.app_version)
 
@@ -23,7 +24,9 @@ vision = get_vision_provider(settings.ocr_provider)
 class HealthResponse(BaseModel):
     status: str
     version: str
+    pipeline_version: str
     ocr_provider: str
+    tesseract_available: bool
 
 
 class ProcessResponse(BaseModel):
@@ -32,14 +35,25 @@ class ProcessResponse(BaseModel):
     shapes: list[dict]
     preprocessed: bool
     warnings: list[str]
+    metadata: dict
 
 
 @app.get("/health", response_model=HealthResponse)
 def health() -> HealthResponse:
+    tesseract_ok = False
+    if settings.ocr_provider != "mock":
+        try:
+            TesseractOCRProvider()
+            tesseract_ok = True
+        except Exception:
+            tesseract_ok = False
+
     return HealthResponse(
-        status="ok",
+        status="ok" if tesseract_ok or settings.ocr_provider == "mock" else "degraded",
         version=settings.app_version,
+        pipeline_version=settings.pipeline_version,
         ocr_provider=settings.ocr_provider,
+        tesseract_available=tesseract_ok,
     )
 
 
@@ -61,12 +75,19 @@ async def process_image(
 
     result = vision.process(content, image_id, file.content_type or "image/png")
 
+    metadata = {
+        **result.metadata,
+        "pipeline_version": settings.pipeline_version,
+        "ocr_provider": settings.ocr_provider,
+    }
+
     return ProcessResponse(
         measurements=[asdict(m) for m in result.measurements],
         ocr_tokens=[asdict(t) for t in result.ocr_tokens],
         shapes=[asdict(s) for s in result.shapes],
         preprocessed=result.preprocessed,
         warnings=result.warnings,
+        metadata=metadata,
     )
 
 

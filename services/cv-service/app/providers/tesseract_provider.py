@@ -2,12 +2,11 @@ import io
 import re
 from uuid import uuid4
 
-import cv2
-import numpy as np
 import pytesseract
 from PIL import Image
 
 from app.config import settings
+from app.preprocessor import ImagePreprocessor
 from app.providers.base import BoundingBox, DetectedMeasurement, OCRToken
 
 
@@ -71,9 +70,12 @@ class TesseractOCRProvider:
 
 
 def extract_measurements_from_tokens(
-    tokens: list[OCRToken], image_id: str
+    tokens: list[OCRToken],
+    image_id: str,
+    min_confidence: float | None = None,
 ) -> list[DetectedMeasurement]:
     """Parse OCR tokens into measurement objects."""
+    floor = min_confidence if min_confidence is not None else settings.min_measurement_confidence
     measurements: list[DetectedMeasurement] = []
     full_text = " ".join(t.text for t in tokens)
 
@@ -84,13 +86,17 @@ def extract_measurements_from_tokens(
         raw = match.group(0).strip()
 
         bbox = _find_bbox_for_text(tokens, raw.split()[0])
+        confidence = bbox[1] if bbox else 0.75
+        if confidence < floor:
+            continue
+
         measurements.append(
             DetectedMeasurement(
                 id=f"measurement-{uuid4().hex[:8]}",
                 value=value,
                 unit=unit,
                 raw_text=raw,
-                confidence=bbox[1] if bbox else 0.75,
+                confidence=confidence,
                 bounding_box=bbox[0] if bbox else BoundingBox(0, 0, 0, 0),
                 label=label,
                 source_image_id=image_id,
@@ -123,31 +129,11 @@ def _deduplicate_measurements(
 
 
 class LocalImageProcessingProvider:
+    def __init__(self) -> None:
+        self._preprocessor = ImagePreprocessor()
+
     def preprocess(self, image_bytes: bytes) -> tuple[bytes, list[str]]:
-        ops: list[str] = []
-        arr = np.frombuffer(image_bytes, dtype=np.uint8)
-        img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
-        if img is None:
-            return image_bytes, ops
+        return self._preprocessor.preprocess_standard(image_bytes)
 
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        ops.append("grayscale")
-
-        mean_brightness = gray.mean()
-        if mean_brightness < 100:
-            gray = cv2.convertScaleAbs(gray, alpha=1.5, beta=30)
-            ops.append("contrast_enhancement")
-
-        if mean_brightness > 200:
-            gray = cv2.convertScaleAbs(gray, alpha=0.8, beta=-20)
-            ops.append("brightness_reduction")
-
-        denoised = cv2.fastNlMeansDenoising(gray, None, 10, 7, 21)
-        ops.append("noise_reduction")
-
-        sharpen_kernel = np.array([[0, -1, 0], [-1, 5, -1], [0, -1, 0]])
-        sharpened = cv2.filter2D(denoised, -1, sharpen_kernel)
-        ops.append("sharpening")
-
-        _, encoded = cv2.imencode(".png", sharpened)
-        return encoded.tobytes(), ops
+    def preprocess_aggressive(self, image_bytes: bytes) -> tuple[bytes, list[str]]:
+        return self._preprocessor.preprocess_aggressive(image_bytes)

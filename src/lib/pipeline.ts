@@ -3,6 +3,7 @@ import { getStorage } from "../infrastructure/storage/local.storage.js";
 import { publishJobStatus } from "../queues/job-events.js";
 import { enqueueAnalysisJob } from "../queues/enqueue.js";
 import { overallConfidence } from "./confidence.js";
+import { buildValidationSummary } from "./validation.js";
 import {
   executeRule,
   getRuleById,
@@ -14,23 +15,7 @@ import {
   selectCalculationPlan,
   type RawMeasurement,
 } from "./variable-mapper.js";
-
-const CV_SERVICE_URL = process.env.CV_SERVICE_URL ?? "http://localhost:8000";
-
-interface CVMeasurement {
-  id: string;
-  value: number;
-  unit: string;
-  raw_text: string;
-  confidence: number;
-  bounding_box: { x: number; y: number; width: number; height: number };
-  label?: string | null;
-}
-
-interface CVResponse {
-  measurements: CVMeasurement[];
-  warnings: string[];
-}
+import { extractVisionMeasurements } from "../modules/vision/vision.service.js";
 
 async function updateDocumentStatus(imageId: string, status: string) {
   await prisma.image.update({
@@ -64,24 +49,6 @@ async function failJob(jobId: string, imageId: string, errorMessage: string) {
   });
 }
 
-async function callCVService(imageBuffer: Buffer, filename: string, imageId: string): Promise<CVResponse> {
-  const formData = new FormData();
-  const blob = new Blob([new Uint8Array(imageBuffer)]);
-  formData.append("file", blob, filename);
-
-  const response = await fetch(`${CV_SERVICE_URL}/process?image_id=${imageId}`, {
-    method: "POST",
-    body: formData,
-  });
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`CV service error: ${response.status} ${text}`);
-  }
-
-  return response.json() as Promise<CVResponse>;
-}
-
 export async function processCalculationJob(jobId: string): Promise<void> {
   try {
     const job = await prisma.calculationJob.findUnique({
@@ -97,24 +64,24 @@ export async function processCalculationJob(jobId: string): Promise<void> {
     const imageBuffer = await readStoredFile(job.image.storagePath);
 
     await updateStatus(jobId, "EXTRACTING_MEASUREMENTS");
-    let cvResult: CVResponse;
 
-    try {
-      cvResult = await callCVService(imageBuffer, job.image.filename, job.imageId);
-    } catch (err) {
-      if (process.env.CV_OCR_PROVIDER === "mock" || process.env.ALLOW_MOCK_CV === "true") {
-        cvResult = { measurements: [], warnings: ["CV service unavailable, using empty result"] };
-      } else {
-        throw new Error(`Unable to process image: ${err instanceof Error ? err.message : "unknown"}`);
-      }
-    }
+    const visionResult = await extractVisionMeasurements(
+      imageBuffer,
+      job.image.filename,
+      job.imageId,
+      job.image.mimeType
+    );
 
-    if (cvResult.measurements.length === 0) {
-      await failJob(jobId, job.imageId, "No measurements detected in the uploaded image");
+    if (visionResult.measurements.length === 0) {
+      const hint =
+        visionResult.warnings.length > 0
+          ? visionResult.warnings.join(" ")
+          : "No measurements detected in the uploaded image";
+      await failJob(jobId, job.imageId, hint);
       return;
     }
 
-    const rawMeasurements: RawMeasurement[] = cvResult.measurements.map((m) => ({
+    const rawMeasurements: RawMeasurement[] = visionResult.measurements.map((m) => ({
       id: m.id,
       value: m.value,
       unit: m.unit,
@@ -205,6 +172,7 @@ export async function processCalculationJob(jobId: string): Promise<void> {
 
     const confidences = rawMeasurements.map((m) => m.confidence);
     const confidence = overallConfidence(confidences);
+    const validationSummary = buildValidationSummary(rawMeasurements, visionResult.warnings);
 
     await prisma.calculationResult.create({
       data: {
@@ -216,7 +184,12 @@ export async function processCalculationJob(jobId: string): Promise<void> {
         result: finalResult,
         unit: finalUnit,
         inputs: mapping.variables as object,
-        validation: { status: "valid", warnings: cvResult.warnings },
+        validation: {
+          status: validationSummary.status,
+          warnings: validationSummary.warnings,
+          lowConfidenceIds: validationSummary.lowConfidenceIds,
+          provenance: visionResult.provenance,
+        } as object,
       },
     });
 
@@ -228,6 +201,7 @@ export async function processCalculationJob(jobId: string): Promise<void> {
         method: plan.method,
         overallConfidence: confidence,
         completedAt: new Date(),
+        methodologyVersion: visionResult.provenance.pipelineVersion,
       },
     });
 

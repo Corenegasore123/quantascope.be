@@ -31,13 +31,21 @@ Located in `services/cv-service/app/providers/base.py`:
 
 ## Preprocessing Pipeline
 
-Applied dynamically based on image analysis:
+Two modes:
 
+### Standard
 1. Grayscale conversion
-2. Contrast enhancement (if dark)
-3. Brightness reduction (if overexposed)
-4. Noise reduction (fastNlMeans)
-5. Sharpening
+2. Contrast enhancement (if dark) or brightness reduction (if overexposed)
+3. Noise reduction (fastNlMeans)
+4. Sharpening
+
+### Aggressive (automatic fallback)
+1. Upscale small images
+2. CLAHE contrast
+3. Adaptive Gaussian threshold
+4. Morphological close
+
+Triggered when standard OCR yields no measurements or average confidence < `CV_CONFIDENCE_FLAG`.
 
 ## Measurement Extraction
 

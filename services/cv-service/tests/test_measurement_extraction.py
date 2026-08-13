@@ -60,6 +60,17 @@ class TestExtractMeasurementsFromTokens:
         assert 6.0 in values
         assert 0.7 in values
 
+    def test_filters_low_confidence_measurements(self):
+        tokens = [
+            OCRToken("5", 0.95, BoundingBox(0, 0, 10, 10)),
+            OCRToken("m", 0.90, BoundingBox(10, 0, 10, 10)),
+            OCRToken("3", 0.40, BoundingBox(20, 0, 10, 10)),
+            OCRToken("m", 0.35, BoundingBox(30, 0, 10, 10)),
+        ]
+        measurements = extract_measurements_from_tokens(tokens, "test-image", min_confidence=0.5)
+        assert len(measurements) == 1
+        assert measurements[0].value == 5.0
+
     def test_deduplicates_identical_values(self):
         tokens = [
             OCRToken("5", 0.95, BoundingBox(0, 0, 10, 10)),
