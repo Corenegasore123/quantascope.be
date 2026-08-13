@@ -18,7 +18,8 @@
     "db:studio": "node scripts/with-database-url.mjs studio",
     "seed": "tsx scripts/seed.ts",
     "worker": "tsx src/worker.ts",
-    "worker:dev": "tsx watch src/worker.ts"
+    "worker:dev": "tsx watch src/worker.ts",
+    "load-test": "node scripts/load-test.mjs"
   },
   "prisma": {
     "seed": "tsx scripts/seed.ts"

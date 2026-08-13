@@ -1,0 +1,10 @@
+node_modules
+dist
+storage
+.env
+.git
+*.md
+docs
+.prisma
+coverage
+**/.pytest_cache

@@ -6,43 +6,97 @@ See [README.md](../README.md).
 
 ## Production Checklist
 
-- [ ] PostgreSQL provisioned with connection pooling
-- [ ] Database configured (`DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, etc.)
-- [ ] Object storage configured (replace local `STORAGE_PATH`)
-- [ ] Tesseract installed on CV service host
-- [ ] `CV_OCR_PROVIDER=tesseract` (not mock)
-- [ ] HTTPS termination (reverse proxy)
-- [ ] Rate limiting on upload endpoints
-- [ ] File size limits enforced
+- [x] Session-based auth with bcrypt
+- [x] User-scoped data isolation
+- [x] Role-based access (USER / ADMIN)
+- [x] Security headers and rate limiting
+- [x] File size limits enforced (`MAX_UPLOAD_SIZE_MB`)
+- [x] Docker images for API, worker, CV service, frontend
+- [x] CI pipeline (typecheck, tests, build)
+- [ ] PostgreSQL provisioned with connection pooling (PgBouncer)
+- [ ] Object storage configured (S3/R2 instead of local `STORAGE_PATH`)
+- [ ] HTTPS termination (reverse proxy / load balancer)
 - [ ] Secrets in environment (never committed)
+- [ ] Redis for horizontal worker scaling
+- [ ] Monitoring and alerting (logs, metrics, uptime)
 
-## Docker (Recommended)
+## Docker
 
-Build and run each service:
+### Development (Redis only)
 
 ```bash
-# CV Service
-docker build -t automeasure-cv services/cv-service
-docker run -p 8000:8000 automeasure-cv
+docker compose up -d
+```
 
-# Web App
-docker build -t automeasure-web apps/web
-docker run -p 3000:3000 -e DB_HOST=... -e DB_USER=... -e DB_PASSWORD=... -e DB_NAME=... automeasure-web
+### Production stack
+
+```bash
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+Services: PostgreSQL, Redis, CV service, API, background worker.
+
+```bash
+# Initialise database
+docker compose -f docker-compose.prod.yml exec api npx prisma db push
+docker compose -f docker-compose.prod.yml exec api npm run seed
+```
+
+### Individual builds
+
+```bash
+docker build -t quantscope-api .
+docker build -t quantscope-worker -f Dockerfile.worker .
+docker build -t quantscope-cv services/cv-service
+```
+
+Frontend (from `frontend/`):
+
+```bash
+docker build -t quantscope-web --build-arg NEXT_PUBLIC_API_URL=https://api.example.com .
 ```
 
 ## Environment Variables
 
 Copy `.env.example` and configure all values for your environment.
 
+Key production variables:
+
+| Variable | Description |
+|----------|-------------|
+| `DB_*` | PostgreSQL connection |
+| `REDIS_URL` | Job queue |
+| `CV_SERVICE_URL` | OCR/CV microservice |
+| `CORS_ORIGIN` | Frontend origin |
+| `NODE_ENV` | `production` |
+| `GLOBAL_RATE_LIMIT_PER_MIN` | Default 120 |
+| `UPLOAD_RATE_LIMIT_PER_HOUR` | Default 30 |
+
 ## Database Migrations
 
 ```bash
 npm run db:generate
-npx prisma migrate deploy
+npm run db:push          # dev
+npx prisma migrate deploy # production with migrations
+```
+
+## CI
+
+Push to `develop` or `main` triggers GitHub Actions:
+
+- Backend: typecheck → engine tests → build
+- Frontend: typecheck → build
+
+## Load Testing
+
+```bash
+npm run load-test
 ```
 
 ## Monitoring
 
-- CV service: `GET /health`
-- Job failures: query `CalculationJob` where `status = FAILED`
-- Confidence review: query jobs where `overallConfidence < 0.80`
+- API health: `GET /health`
+- Readiness: `GET /api/ready` (DB + Redis + CV)
+- Admin panel: `/admin` (stats + service health)
+- Job failures: `CalculationJob` where `status = FAILED`
+- Low confidence: jobs where validation status = `needs_review`

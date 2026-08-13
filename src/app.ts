@@ -13,9 +13,24 @@ import { notificationsRouter } from "./modules/notifications/notifications.route
 import { projectMembersRouter } from "./modules/projects/members.routes.js";
 import { adminRouter } from "./modules/admin/admin.routes.js";
 import { errorHandler } from "./middleware/error.js";
+import {
+  securityHeaders,
+  rateLimit,
+  authRateLimit,
+  uploadRateLimit,
+} from "./middleware/security.js";
 
 export const app = express();
 
+app.set("trust proxy", 1);
+
+app.use(securityHeaders);
+app.use(
+  rateLimit({
+    windowMs: 60_000,
+    max: parseInt(process.env.GLOBAL_RATE_LIMIT_PER_MIN ?? "120", 10),
+  })
+);
 app.use(
   cors({
     origin: process.env.CORS_ORIGIN ?? "http://localhost:3000",
@@ -40,14 +55,14 @@ app.get("/api/ready", async (_req, res) => {
   }
 });
 
-app.use("/api/auth", authRouter);
+app.use("/api/auth", authRateLimit({ windowMs: 15 * 60_000, max: 20 }), authRouter);
 app.use("/api/dashboard", dashboardRouter);
 app.use("/api/notifications", notificationsRouter);
 app.use("/api/projects", projectsRouter);
 app.use("/api/projects/:id/members", projectMembersRouter);
-app.use("/api/projects/:projectId/documents", projectDocumentsRouter);
+app.use("/api/projects/:projectId/documents", uploadRateLimit(), projectDocumentsRouter);
 app.use("/api/documents", documentsRouter);
-app.use("/api/calculations", calculationsRouter);
+app.use("/api/calculations", uploadRateLimit(), calculationsRouter);
 app.use("/api/images", imagesRouter);
 app.use("/api/calculation-rules", calculationRulesRouter);
 app.use("/api/admin", adminRouter);
