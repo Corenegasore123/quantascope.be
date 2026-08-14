@@ -1,4 +1,5 @@
 import type { Request, Response, NextFunction } from "express";
+import { checkRedisRateLimit } from "../infrastructure/redis/rate-limit.js";
 
 export function securityHeaders(_req: Request, res: Response, next: NextFunction) {
   res.setHeader("X-Content-Type-Options", "nosniff");
@@ -39,31 +40,60 @@ function clientKey(req: Request): string {
   return req.ip ?? "unknown";
 }
 
-export function rateLimit(options: RateLimitOptions) {
+function applyRateLimitHeaders(res: Response, max: number, remaining: number, resetAt: number) {
+  res.setHeader("X-RateLimit-Limit", String(max));
+  res.setHeader("X-RateLimit-Remaining", String(remaining));
+  res.setHeader("X-RateLimit-Reset", String(Math.ceil(resetAt / 1000)));
+}
+
+function memoryRateLimit(key: string, windowMs: number, max: number) {
+  const now = Date.now();
+  let bucket = buckets.get(key);
+
+  if (!bucket || bucket.resetAt <= now) {
+    bucket = { count: 0, resetAt: now + windowMs };
+    buckets.set(key, bucket);
+  }
+
+  bucket.count += 1;
+
+  return {
+    allowed: bucket.count <= max,
+    remaining: Math.max(0, max - bucket.count),
+    resetAt: bucket.resetAt,
+  };
+}
+
+async function enforceRateLimit(
+  req: Request,
+  res: Response,
+  key: string,
+  options: RateLimitOptions
+): Promise<boolean> {
   const { windowMs, max, message = "Too many requests, please try again later" } = options;
 
-  return (req: Request, res: Response, next: NextFunction) => {
-    const key = `${clientKey(req)}:${req.path}`;
-    const now = Date.now();
-    let bucket = buckets.get(key);
+  const redisResult = await checkRedisRateLimit(key, windowMs, max);
+  const result = redisResult ?? memoryRateLimit(key, windowMs, max);
 
-    if (!bucket || bucket.resetAt <= now) {
-      bucket = { count: 0, resetAt: now + windowMs };
-      buckets.set(key, bucket);
+  applyRateLimitHeaders(res, max, result.remaining, result.resetAt);
+
+  if (!result.allowed) {
+    res.status(429).json({ error: message, code: "RATE_LIMITED" });
+    return false;
+  }
+
+  return true;
+}
+
+export function rateLimit(options: RateLimitOptions) {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const key = `${clientKey(req)}:${req.path}`;
+      const allowed = await enforceRateLimit(req, res, key, options);
+      if (allowed) next();
+    } catch {
+      next();
     }
-
-    bucket.count += 1;
-
-    res.setHeader("X-RateLimit-Limit", String(max));
-    res.setHeader("X-RateLimit-Remaining", String(Math.max(0, max - bucket.count)));
-    res.setHeader("X-RateLimit-Reset", String(Math.ceil(bucket.resetAt / 1000)));
-
-    if (bucket.count > max) {
-      res.status(429).json({ error: message, code: "RATE_LIMITED" });
-      return;
-    }
-
-    next();
   };
 }
 
@@ -71,24 +101,14 @@ export function rateLimit(options: RateLimitOptions) {
 export function authRateLimit(options: RateLimitOptions) {
   const { windowMs, max, message = "Too many authentication attempts" } = options;
 
-  return (req: Request, res: Response, next: NextFunction) => {
-    const key = `auth:${clientKey(req)}`;
-    const now = Date.now();
-    let bucket = buckets.get(key);
-
-    if (!bucket || bucket.resetAt <= now) {
-      bucket = { count: 0, resetAt: now + windowMs };
-      buckets.set(key, bucket);
+  return async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const key = `auth:${clientKey(req)}`;
+      const allowed = await enforceRateLimit(req, res, key, { windowMs, max, message });
+      if (allowed) next();
+    } catch {
+      next();
     }
-
-    bucket.count += 1;
-
-    if (bucket.count > max) {
-      res.status(429).json({ error: message, code: "RATE_LIMITED" });
-      return;
-    }
-
-    next();
   };
 }
 
@@ -104,6 +124,6 @@ export function uploadRateLimit() {
       next();
       return;
     }
-    limiter(req, res, next);
+    void limiter(req, res, next);
   };
 }

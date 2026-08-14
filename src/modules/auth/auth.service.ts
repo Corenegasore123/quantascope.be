@@ -1,7 +1,12 @@
 import { prisma } from "../../lib/db.js";
 import { AppError } from "../../shared/errors.js";
 import { hashPassword, verifyPassword } from "./password.js";
-import { createSession, revokeSession } from "./session.service.js";
+import { createSession, revokeSession, revokeAllUserSessionsExcept } from "./session.service.js";
+import {
+  assertLoginNotLocked,
+  recordLoginFailure,
+  clearLoginFailures,
+} from "../../infrastructure/redis/auth-lockout.js";
 
 export interface RegisterInput {
   name: string;
@@ -77,15 +82,21 @@ export async function loginUser(
   meta?: { ipAddress?: string; userAgent?: string }
 ) {
   const email = input.email.trim().toLowerCase();
+  await assertLoginNotLocked(email);
+
   const user = await prisma.user.findUnique({ where: { email } });
   if (!user) {
+    await recordLoginFailure(email);
     throw new AppError(401, "Invalid email or password", "INVALID_CREDENTIALS");
   }
 
   const valid = await verifyPassword(input.password, user.passwordHash);
   if (!valid) {
+    await recordLoginFailure(email);
     throw new AppError(401, "Invalid email or password", "INVALID_CREDENTIALS");
   }
+
+  await clearLoginFailures(email);
 
   await prisma.auditLog.create({
     data: {
@@ -113,7 +124,8 @@ export async function logoutUser(token: string, userId?: string) {
 export async function changePassword(
   userId: string,
   currentPassword: string,
-  newPassword: string
+  newPassword: string,
+  keepSessionToken?: string
 ) {
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) throw new AppError(404, "User not found");
@@ -129,6 +141,8 @@ export async function changePassword(
     where: { id: userId },
     data: { passwordHash: await hashPassword(newPassword) },
   });
+
+  await revokeAllUserSessionsExcept(userId, keepSessionToken);
 
   await prisma.auditLog.create({
     data: { userId, action: "user.password_changed", resource: `user:${userId}` },

@@ -15,6 +15,7 @@ import { projectCollaborationRouter } from "./modules/projects/collaboration.rou
 import { adminRouter } from "./modules/admin/admin.routes.js";
 import { appRouter } from "./modules/app/app.routes.js";
 import { errorHandler } from "./middleware/error.js";
+import { requireAuth } from "./middleware/auth.js";
 import {
   securityHeaders,
   rateLimit,
@@ -26,6 +27,12 @@ export const app = express();
 
 app.set("trust proxy", 1);
 
+function corsOrigins(): string | string[] {
+  const raw = process.env.CORS_ORIGIN ?? "http://localhost:3000";
+  const origins = raw.split(",").map((value) => value.trim()).filter(Boolean);
+  return origins.length === 1 ? origins[0]! : origins;
+}
+
 app.use(securityHeaders);
 app.use(
   rateLimit({
@@ -35,7 +42,7 @@ app.use(
 );
 app.use(
   cors({
-    origin: process.env.CORS_ORIGIN ?? "http://localhost:3000",
+    origin: corsOrigins(),
     credentials: true,
   })
 );
@@ -55,6 +62,11 @@ app.get("/api/ready", async (_req, res) => {
   } catch {
     res.status(503).json({ status: "not_ready", database: "error" });
   }
+});
+
+// Lightweight session validation for frontend route guards (not auth-rate-limited)
+app.get("/api/auth/check", requireAuth, (req, res) => {
+  res.json({ ok: true, userId: req.user!.id });
 });
 
 app.use("/api/auth", authRateLimit({ windowMs: 15 * 60_000, max: 20 }), authRouter);

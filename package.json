@@ -16,13 +16,10 @@
     "db:generate": "node scripts/with-database-url.mjs generate",
     "db:push": "node scripts/with-database-url.mjs db push",
     "db:studio": "node scripts/with-database-url.mjs studio",
-    "seed": "tsx scripts/seed.ts",
+    "redis:up": "docker compose up -d redis",
     "worker": "tsx src/worker.ts",
     "worker:dev": "tsx watch src/worker.ts",
     "load-test": "node scripts/load-test.mjs"
-  },
-  "prisma": {
-    "seed": "tsx scripts/seed.ts"
   },
   "dependencies": {
     "@auto-measure/calculation-engine": "*",

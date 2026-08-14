@@ -18,15 +18,17 @@ pip install -r requirements.txt
 cp .env.example .env              # configure DB_* credentials
 npm run db:generate
 npm run db:push
-npm run seed                  # optional dev admin user
+npm run redis:up              # start Redis (required when REDIS_ENABLED=true)
 ```
 
-## Auth (Milestone 1)
+## Auth
 
 - Register / login / logout via `/api/auth/*`
 - Session cookie: `quantscope_session` (httpOnly)
+- Session validation: `GET /api/auth/check`
+- Redis-backed rate limits and login lockout
 - All calculation and image routes require authentication
-- Dev admin after seed: `admin@quantscope.local` / `Admin123!`
+- Create accounts via `/api/auth/register` or the frontend sign-up page
 
 See [docs/authentication.md](./docs/authentication.md).
 
@@ -40,8 +42,8 @@ npm run dev
 cd services/cv-service
 ../../.venv/Scripts/python.exe -m uvicorn app.main:app --reload --port 8000
 
-# Terminal 3 — Redis (optional but recommended)
-docker compose up -d
+# Terminal 3 — Redis (required)
+npm run redis:up
 
 # Terminal 4 — Background worker
 npm run worker:dev
@@ -55,7 +57,7 @@ API: http://localhost:4000/health
 |---------|-------------|
 | `npm run dev` | Start API with hot reload |
 | `npm run db:push` | Sync database schema |
-| `npm run seed` | Create dev admin user |
+| `npm run redis:up` | Start Redis via Docker Compose |
 | `npm run worker` | Start analysis worker |
 | `npm run worker:dev` | Worker with hot reload |
 | `npm run test:engine` | Run calculation engine tests |

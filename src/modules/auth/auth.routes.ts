@@ -8,33 +8,11 @@ import {
   PUBLIC_USER_SELECT,
 } from "./auth.service.js";
 import { prisma } from "../../lib/db.js";
-import { requireAuth, SESSION_COOKIE, clientMeta } from "../../middleware/auth.js";
-import { ROLE_COOKIE, roleCookieValue } from "../../middleware/roles.js";
+import { requireAuth, clientMeta } from "../../middleware/auth.js";
 import { AppError } from "../../shared/errors.js";
+import { clearAuthCookies, setRoleCookie, setSessionCookie } from "../../lib/cookies.js";
 
 export const authRouter = Router();
-
-const SESSION_DAYS = parseInt(process.env.SESSION_MAX_AGE_DAYS ?? "30", 10);
-const COOKIE_OPTS = {
-  httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
-  sameSite: "lax" as const,
-  maxAge: SESSION_DAYS * 24 * 60 * 60 * 1000,
-  path: "/",
-};
-
-function setSessionCookie(res: import("express").Response, token: string) {
-  res.cookie(SESSION_COOKIE, token, COOKIE_OPTS);
-}
-
-function setRoleCookie(res: import("express").Response, role: import("@prisma/client").UserRole) {
-  res.cookie(ROLE_COOKIE, roleCookieValue(role), COOKIE_OPTS);
-}
-
-function clearAuthCookies(res: import("express").Response) {
-  res.clearCookie(SESSION_COOKIE, { path: "/" });
-  res.clearCookie(ROLE_COOKIE, { path: "/" });
-}
 
 const registerSchema = z.object({
   name: z.string().min(1).max(120),
@@ -111,7 +89,12 @@ authRouter.get("/me", requireAuth, async (req, res, next) => {
 authRouter.patch("/password", requireAuth, async (req, res, next) => {
   try {
     const body = changePasswordSchema.parse(req.body);
-    await changePassword(req.user!.id, body.currentPassword, body.newPassword);
+    await changePassword(
+      req.user!.id,
+      body.currentPassword,
+      body.newPassword,
+      req.sessionToken
+    );
     res.json({ ok: true });
   } catch (error) {
     next(error);
