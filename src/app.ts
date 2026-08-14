@@ -13,6 +13,7 @@ import { notificationsRouter } from "./modules/notifications/notifications.route
 import { projectMembersRouter } from "./modules/projects/members.routes.js";
 import { projectCollaborationRouter } from "./modules/projects/collaboration.routes.js";
 import { adminRouter } from "./modules/admin/admin.routes.js";
+import { appRouter } from "./modules/app/app.routes.js";
 import { errorHandler } from "./middleware/error.js";
 import {
   securityHeaders,
@@ -67,6 +68,8 @@ app.use("/api/documents", documentsRouter);
 app.use("/api/calculations", uploadRateLimit(), calculationsRouter);
 app.use("/api/images", imagesRouter);
 app.use("/api/calculation-rules", calculationRulesRouter);
+// Frontend workspace paths (/api/app/history, /api/app/projects/.../report)
+app.use("/api/app", appRouter);
 // Platform admin only — engineer workspace routes above must stay user-scoped.
 app.use("/api/admin", adminRouter);
 
