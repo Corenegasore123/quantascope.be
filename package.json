@@ -9,9 +9,9 @@
   ],
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc",
+    "build": "tsc -p tsconfig.build.json",
     "start": "node dist/index.js",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.scripts.json",
+    "typecheck": "tsc --noEmit",
     "test:engine": "npm run test --workspace=packages/calculation-engine",
     "db:generate": "node scripts/with-database-url.mjs generate",
     "db:push": "node scripts/with-database-url.mjs db push",

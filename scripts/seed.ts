@@ -113,7 +113,7 @@ async function main() {
   const highwayProject = await ensureProject(
     engineer.id,
     "Highway Cut-Fill Study",
-    "Chapter 3 earthwork quantities for the north corridor widening."
+    "Earthwork quantities for the north corridor widening."
   );
   const gradingProject = await ensureProject(
     engineer.id,
@@ -130,7 +130,7 @@ async function main() {
     "MEMBER_ADDED",
     "Added to Highway Cut-Fill Study",
     "Alex Engineer invited you as an editor.",
-    `/projects/${highwayProject.id}`
+    `/projects/${highwayProject.id}` 
   );
   await ensureNotification(
     engineer.id,
