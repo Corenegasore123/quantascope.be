@@ -11,6 +11,7 @@ import { documentsRouter } from "./modules/documents/documents.routes.js";
 import { dashboardRouter } from "./modules/dashboard/dashboard.routes.js";
 import { notificationsRouter } from "./modules/notifications/notifications.routes.js";
 import { projectMembersRouter } from "./modules/projects/members.routes.js";
+import { projectCollaborationRouter } from "./modules/projects/collaboration.routes.js";
 import { adminRouter } from "./modules/admin/admin.routes.js";
 import { errorHandler } from "./middleware/error.js";
 import {
@@ -59,7 +60,8 @@ app.use("/api/auth", authRateLimit({ windowMs: 15 * 60_000, max: 20 }), authRout
 app.use("/api/dashboard", dashboardRouter);
 app.use("/api/notifications", notificationsRouter);
 app.use("/api/projects", projectsRouter);
-app.use("/api/projects/:id/members", projectMembersRouter);
+app.use("/api/projects/:projectId/members", projectMembersRouter);
+app.use("/api/projects/:projectId/collaboration", projectCollaborationRouter);
 app.use("/api/projects/:projectId/documents", uploadRateLimit(), projectDocumentsRouter);
 app.use("/api/documents", documentsRouter);
 app.use("/api/calculations", uploadRateLimit(), calculationsRouter);
