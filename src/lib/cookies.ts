@@ -1,10 +1,10 @@
 import type { CookieOptions, Response } from "express";
 import { SESSION_COOKIE } from "../middleware/auth.js";
 import { ROLE_COOKIE } from "../middleware/roles.js";
+import { sessionMaxAgeMs } from "./session-config.js";
 
 export const CONSENT_COOKIE = "quantscope_cookie_consent";
 
-const SESSION_DAYS = parseInt(process.env.SESSION_MAX_AGE_DAYS ?? "30", 10);
 const CONSENT_DAYS = parseInt(process.env.COOKIE_CONSENT_DAYS ?? "365", 10);
 
 function cookieSameSite(): CookieOptions["sameSite"] {
@@ -25,7 +25,7 @@ export function authCookieOptions(): CookieOptions {
     httpOnly: true,
     secure: cookieSecure(),
     sameSite,
-    maxAge: SESSION_DAYS * 24 * 60 * 60 * 1000,
+    maxAge: sessionMaxAgeMs(),
     path: "/",
   };
 

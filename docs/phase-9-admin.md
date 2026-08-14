@@ -15,7 +15,7 @@ Admin-only routes under `/api/admin` (requires `UserRole.ADMIN`).
 
 ## Access
 
-- Seed admin: `admin@quantscope.local` / `Admin123!` (`npm run seed`)
+- Grant `ADMIN` role in the database for platform operators (no demo seed users)
 - Admins cannot demote their own account
 - All admin actions are audit-logged
 

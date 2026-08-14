@@ -39,8 +39,9 @@ Services: PostgreSQL, Redis, CV service, API, background worker.
 ```bash
 # Initialise database
 docker compose -f docker-compose.prod.yml exec api npx prisma db push
-docker compose -f docker-compose.prod.yml exec api npm run seed
 ```
+
+Create the first admin user through registration, then promote the account in the database if platform admin access is required.
 
 ### Individual builds
 

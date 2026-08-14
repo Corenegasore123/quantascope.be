@@ -47,8 +47,9 @@ Append-only `AuditLog` for security events: register, login, logout, password ch
 ```bash
 npm run db:generate
 npm run db:push
-npm run seed
 ```
+
+Accounts are created through `/api/auth/register` (or the QuantaScope sign-up page). No demo seed data is shipped.
 
 ## Future (not implemented)
 

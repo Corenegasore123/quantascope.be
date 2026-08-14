@@ -19,7 +19,7 @@ QuantScope uses **database-backed sessions** with **httpOnly cookies** (not JWT 
 
 - Token: 32 random bytes (hex), stored as SHA-256 hash in `Session` table
 - Cookie name: `quantscope_session`
-- Default lifetime: 30 days (`SESSION_MAX_AGE_DAYS`)
+- Default lifetime: 7 hours (`SESSION_MAX_AGE_HOURS`)
 - Supports `Authorization: Bearer <token>` for API clients
 
 ## Password security

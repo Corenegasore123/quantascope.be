@@ -6,7 +6,7 @@ import {
   invalidateCachedSession,
 } from "../../infrastructure/redis/session-cache.js";
 
-const SESSION_DAYS = parseInt(process.env.SESSION_MAX_AGE_DAYS ?? "30", 10);
+import { sessionMaxAgeMs } from "../../lib/session-config.js";
 
 function sessionTtlSeconds(expiresAt: Date): number {
   return Math.max(0, Math.floor((expiresAt.getTime() - Date.now()) / 1000));
@@ -18,7 +18,7 @@ export async function createSession(
 ): Promise<string> {
   const token = generateSessionToken();
   const tokenHash = hashToken(token);
-  const expiresAt = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000);
+  const expiresAt = new Date(Date.now() + sessionMaxAgeMs());
 
   await prisma.session.create({
     data: {

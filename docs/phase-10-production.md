@@ -22,7 +22,6 @@ docker compose -f docker-compose.prod.yml up -d --build
 
 # Run migrations inside api container
 docker compose -f docker-compose.prod.yml exec api npx prisma db push
-docker compose -f docker-compose.prod.yml exec api npm run seed
 ```
 
 | Image | Dockerfile |

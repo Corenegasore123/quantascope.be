@@ -66,14 +66,38 @@ app.get("/api/ready", async (_req, res) => {
 });
 
 // Cookie consent (must be reachable before auth cookies are set)
-app.use("/api/consent", consentRouter);
+app.use(
+  "/api/consent",
+  rateLimit({
+    windowMs: 60_000,
+    max: parseInt(process.env.CONSENT_RATE_LIMIT_PER_MIN ?? "20", 10),
+    message: "Too many consent requests, please try again later",
+  }),
+  consentRouter
+);
 
-// Lightweight session validation for frontend route guards (not auth-rate-limited)
-app.get("/api/auth/check", requireAuth, (req, res) => {
-  res.json({ ok: true, userId: req.user!.id });
-});
+// Lightweight session validation for frontend route guards
+app.get(
+  "/api/auth/check",
+  rateLimit({
+    windowMs: 60_000,
+    max: parseInt(process.env.AUTH_CHECK_RATE_LIMIT_PER_MIN ?? "60", 10),
+    message: "Too many session checks, please try again later",
+  }),
+  requireAuth,
+  (req, res) => {
+    res.json({ ok: true, userId: req.user!.id });
+  }
+);
 
-app.use("/api/auth", authRateLimit({ windowMs: 15 * 60_000, max: 20 }), authRouter);
+app.use(
+  "/api/auth",
+  authRateLimit({
+    windowMs: 15 * 60_000,
+    max: parseInt(process.env.AUTH_RATE_LIMIT_PER_15MIN ?? "20", 10),
+  }),
+  authRouter
+);
 app.use("/api/dashboard", dashboardRouter);
 app.use("/api/notifications", notificationsRouter);
 app.use("/api/projects", projectsRouter);
