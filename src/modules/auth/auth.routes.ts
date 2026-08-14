@@ -9,6 +9,7 @@ import {
 } from "./auth.service.js";
 import { prisma } from "../../lib/db.js";
 import { requireAuth, clientMeta } from "../../middleware/auth.js";
+import { assertCookieConsent } from "../../middleware/consent.js";
 import { AppError } from "../../shared/errors.js";
 import { clearAuthCookies, setRoleCookie, setSessionCookie } from "../../lib/cookies.js";
 
@@ -33,6 +34,7 @@ const changePasswordSchema = z.object({
 
 authRouter.post("/register", async (req, res, next) => {
   try {
+    assertCookieConsent(req);
     const body = registerSchema.parse(req.body);
     if (body.password !== body.confirmPassword) {
       throw new AppError(400, "Passwords do not match", "PASSWORD_MISMATCH");
@@ -51,6 +53,7 @@ authRouter.post("/register", async (req, res, next) => {
 
 authRouter.post("/login", async (req, res, next) => {
   try {
+    assertCookieConsent(req);
     const body = loginSchema.parse(req.body);
     const { user, token } = await loginUser(body, clientMeta(req));
     setSessionCookie(res, token);

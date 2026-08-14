@@ -14,6 +14,7 @@ import { projectMembersRouter } from "./modules/projects/members.routes.js";
 import { projectCollaborationRouter } from "./modules/projects/collaboration.routes.js";
 import { adminRouter } from "./modules/admin/admin.routes.js";
 import { appRouter } from "./modules/app/app.routes.js";
+import { consentRouter } from "./modules/consent/consent.routes.js";
 import { errorHandler } from "./middleware/error.js";
 import { requireAuth } from "./middleware/auth.js";
 import {
@@ -63,6 +64,9 @@ app.get("/api/ready", async (_req, res) => {
     res.status(503).json({ status: "not_ready", database: "error" });
   }
 });
+
+// Cookie consent (must be reachable before auth cookies are set)
+app.use("/api/consent", consentRouter);
 
 // Lightweight session validation for frontend route guards (not auth-rate-limited)
 app.get("/api/auth/check", requireAuth, (req, res) => {

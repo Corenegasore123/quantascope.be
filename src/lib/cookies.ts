@@ -2,7 +2,10 @@ import type { CookieOptions, Response } from "express";
 import { SESSION_COOKIE } from "../middleware/auth.js";
 import { ROLE_COOKIE } from "../middleware/roles.js";
 
+export const CONSENT_COOKIE = "quantscope_cookie_consent";
+
 const SESSION_DAYS = parseInt(process.env.SESSION_MAX_AGE_DAYS ?? "30", 10);
+const CONSENT_DAYS = parseInt(process.env.COOKIE_CONSENT_DAYS ?? "365", 10);
 
 function cookieSameSite(): CookieOptions["sameSite"] {
   const value = process.env.COOKIE_SAME_SITE?.toLowerCase();
@@ -53,4 +56,30 @@ export function clearAuthCookies(res: Response) {
   const opts = clearAuthCookieOptions();
   res.clearCookie(SESSION_COOKIE, opts);
   res.clearCookie(ROLE_COOKIE, opts);
+}
+
+export function consentCookieOptions(): CookieOptions {
+  const sameSite = cookieSameSite();
+  const opts: CookieOptions = {
+    httpOnly: true,
+    secure: cookieSecure(),
+    sameSite,
+    maxAge: CONSENT_DAYS * 24 * 60 * 60 * 1000,
+    path: "/",
+  };
+
+  if (process.env.COOKIE_DOMAIN) {
+    opts.domain = process.env.COOKIE_DOMAIN;
+  }
+
+  return opts;
+}
+
+export function setConsentCookie(res: Response) {
+  res.cookie(CONSENT_COOKIE, "accepted", consentCookieOptions());
+}
+
+export function clearConsentCookie(res: Response) {
+  const opts = clearAuthCookieOptions();
+  res.clearCookie(CONSENT_COOKIE, opts);
 }
