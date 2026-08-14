@@ -9,6 +9,7 @@ import {
 } from "./auth.service.js";
 import { prisma } from "../../lib/db.js";
 import { requireAuth, SESSION_COOKIE, clientMeta } from "../../middleware/auth.js";
+import { ROLE_COOKIE, roleCookieValue } from "../../middleware/roles.js";
 import { AppError } from "../../shared/errors.js";
 
 export const authRouter = Router();
@@ -26,8 +27,13 @@ function setSessionCookie(res: import("express").Response, token: string) {
   res.cookie(SESSION_COOKIE, token, COOKIE_OPTS);
 }
 
-function clearSessionCookie(res: import("express").Response) {
+function setRoleCookie(res: import("express").Response, role: import("@prisma/client").UserRole) {
+  res.cookie(ROLE_COOKIE, roleCookieValue(role), COOKIE_OPTS);
+}
+
+function clearAuthCookies(res: import("express").Response) {
   res.clearCookie(SESSION_COOKIE, { path: "/" });
+  res.clearCookie(ROLE_COOKIE, { path: "/" });
 }
 
 const registerSchema = z.object({
@@ -58,6 +64,7 @@ authRouter.post("/register", async (req, res, next) => {
       clientMeta(req)
     );
     setSessionCookie(res, token);
+    setRoleCookie(res, user.role);
     res.status(201).json({ user });
   } catch (error) {
     next(error);
@@ -69,6 +76,7 @@ authRouter.post("/login", async (req, res, next) => {
     const body = loginSchema.parse(req.body);
     const { user, token } = await loginUser(body, clientMeta(req));
     setSessionCookie(res, token);
+    setRoleCookie(res, user.role);
     res.json({ user });
   } catch (error) {
     next(error);
@@ -80,7 +88,7 @@ authRouter.post("/logout", requireAuth, async (req, res, next) => {
     if (req.sessionToken) {
       await logoutUser(req.sessionToken, req.user!.id);
     }
-    clearSessionCookie(res);
+    clearAuthCookies(res);
     res.json({ ok: true });
   } catch (error) {
     next(error);

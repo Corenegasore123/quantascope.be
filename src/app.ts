@@ -67,6 +67,7 @@ app.use("/api/documents", documentsRouter);
 app.use("/api/calculations", uploadRateLimit(), calculationsRouter);
 app.use("/api/images", imagesRouter);
 app.use("/api/calculation-rules", calculationRulesRouter);
+// Platform admin only — engineer workspace routes above must stay user-scoped.
 app.use("/api/admin", adminRouter);
 
 app.use(errorHandler);

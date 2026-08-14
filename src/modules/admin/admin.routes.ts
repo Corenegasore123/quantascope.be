@@ -2,12 +2,14 @@ import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../../lib/db.js";
 import { getAdminStats, getSystemHealth } from "../../lib/system-health.js";
-import { requireAuth, requireRole } from "../../middleware/auth.js";
+import { requireAuth } from "../../middleware/auth.js";
+import { requireAdmin } from "../../middleware/roles.js";
 import { AppError } from "../../shared/errors.js";
 
+/** Platform administration — isolated from engineer workspace APIs. */
 export const adminRouter = Router();
 
-adminRouter.use(requireAuth, requireRole("ADMIN"));
+adminRouter.use(requireAuth, requireAdmin);
 
 adminRouter.get("/stats", async (_req, res, next) => {
   try {
