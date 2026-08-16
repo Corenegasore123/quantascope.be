@@ -1,0 +1,43 @@
+OFFICE BUILDING 137
+
+Centre to Centre Length of Walls —(Ex. 10)
+Officer's room and left hand office room combined (30 cm wall) —
+
+Long walls c. to c. = 5.00 + 4.20 + .3+ 15 = 9.65 m
+Short walls c. to c. = 4.00 + .30 = 4.30 m
+
+Semi circular wall c. to.c. =r =Bx 2.15 = 6.757 m = 6.76 m
+
+Office room right side (30 cm wall)—
+“ Long wails c. to c. = 7.00 + .30 = 7.30 m
+Short walls c. to c. = 4.50 + .30 = 4.80 m
+
+Short room (20 cm wall) —
+Back wall c. to c. = 3.00 + .20 = 3.20 m
+Side wall c. to c. = 2.50 + tO 2.75 m
+Bath and W,C. (20 cm wall)—
+Front wall c. to c. = 2.50 + .20 = 2.70 m
+Side wall c. to ¢. = 2.00+-20 +30. 2.25 m
+
+Back verandah (20 cm wall) c. to ¢. = 7.30 ~ 3.40 +32 +30 = 4.15 m
+
+Front verandah (20 em wall) e. toc. = 7.30 - 2.90 +304 30 = 4.65 m
+
+Total Centre Line Length
+
+30 cm walls of main rooms —
+Total length of centre lines of all 30 cm walls = 2 x 9.65 + 2 x 4.30 + 6.76 + 2 x 7.30 + 4.80
+= 54.06 m
+Number of junctions = 4 (Junctions with 30 cm wall)
+
+20 cm walls of store and bath and W.C. —
+Total length of centre lines of 20 cm walls of Store and
+Bath and W.C. = (3.20 + 2 x 2.75) + (2.70 + 2 x 2.25) = 15.90 m
+Number of junctions = 4 (Junctions with 30 cm wall)
+
+20 cm walls of front and back verandah —
+Total length of centre lines of 20 cm walls of verandah = 4.65 + 4.15 = 8.80 m
+Number of junctions = 4 (Two junctions with 30 cm wall and two junctions with 20 cm wall).
+
+Note. — Estimate of this example (Ex. 10) has been solved by centre line method in the
+following pages.

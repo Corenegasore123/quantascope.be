@@ -1,0 +1,51 @@
+134
+
+ESTIMATING AND COSTING
+
+Details of Measurement and Calculation of Quantities (Ex. 9)
+
+Item| Particulars of Height
+No. | items and details No. | Length |Breadth| or Quantity| Explanatory notes
+of works Depth
+m m m
+1. } Earthwork in foun-
+dation ~ | 1 | 2027) 90 | 90 | 16.42 | L = Total centre length
+cum = 20.27 m
+2. | Concrete in founda:
+tion 1 | 20.27 90 30 5.47
+cum
+3. | Brickwork in
+foundation and
+plinth in 1:6 cement
+mortar—
+{st footing 1 | 20.27 -70 -20 2.84
+2nd footing L | 20.27 60 .20 2.43
+3rd footing 1 | 20,27 50 .20 2.03
+Plinth wall 1} 20.27 40 60 4.86
+Total } 12.16
+cum
+4. |2 cm Damp proof
+course e+ { 1 | 20.27 40 => 8.11
+Deduct door sill 1 1.20 40 - 0.48
+Net | Total 7.63
+5. | Brickwork in super- sqm
+structure in lime
+mortar 1 | 20.27 30 3.70 | 22.50
+Deduct —
+Door opening 1 1.20 30 | 2.20 0.79
+Window openings 6 1,00 30 | 1.50 2.70
+Shelf -| 2 1.00 20 | 1.90 0.76 cas
+Lintel over door ..! 1 | 1.44} 30 | 10 | 0.043 | { 10m thick lintel,
+Lintel over windows) 6 | 1.24 | 30 | 10 | 0.223 | (12cm bearing
+Lintel over shelf ...} 2 1.24 30 10 0.074
+[Total delduction] 4.59
+Net | Total | 17.91
+6. |2.Seme.c. over 7.5 oom
+cm lime concrete
+floor
+Rectangular portion | _ 18.00
+Front half . I _ 6.58
+hexagonal portion
+Door sill 1 —. | 0.42 | Only 2.5 cme.c.
+Total | 33% |
+

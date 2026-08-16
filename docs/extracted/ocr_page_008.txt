@@ -1,0 +1,53 @@
+MASONRY TANK n
+
+ABSTRACT OF ESTIMATED COST (Ex. 2)
+
+- Rate
+Particulars of Items Qty. jUnit| Rs. Per Rs.
+. Earthwork in excavation 87.26 cu mj350.00/% cu m| 305.40
+= Lime concrete'in foundation & floor 14.80 jcu m|220.00} cum | 3256.00
+3. Ist class Brickwork in I : 6 cement mortar 37.02 jcu m|320.00] cu m |11846.40
+
+12 mm Cement plastering | : 2 with coarse sand | 60.00 |sqm} 8.50] sqm| 510.00
+12 mm Cement plastering | : 4 with local sand | 57.40 |sqm} 8.30| sqm| 476.42
+
+5 cm Cement concrete 1 : 1% : 3 floor 35.00 sq m} 55.00} sqm | 1925.00
+Total... }|18319.22
+
+Add 3% for Contingencies we 549.58
+
+Add 2% for Workcharged Establishment am 366.38
+
+Grand Total... 9235.18
+
+The quantities of Earthwork in excavation in foundation, Lime concrete in foundation and
+work in Example 2 can be found in a simpler and quicker manner by centre line method as
+24s;
+
+Total centre length for portion below G.L. = 2(7.50 + 5.50) = 26.00 m
+Total centre length for 40 cm wall above G.L. = 2(7.40 + 5.40) =25.60 m
+Total centre length for 30 cm wall = 2(7.30 + 5.30) = 25.20 m
+
+No. L. B. Ht.orD Qty. Total Qty.
+
+Earthwork in excavation
+in foundation -. 1 26,00 1.00 1.95 — 50.70cum
+= Lime concrete infoundation ... 1 26.00 1.00 30 = 7.80 cum
+= Ist class brickwork in 1 : 6
+cement mortar
+Below G.L. —
+Ist footing «1 26.00 -70 -20 3.64
+2nd footing «1 26.00 -60 -20 3.12
+50 cm wall = 1 26.00 -50 1.25 16.25
+Above G.L. —
+40 cm wall ou. 1 25.60 -40 1.00 10.24
+30 cm wall «1 25.20 30 -50 3.78
+
+Total 37.03 cum
+Remaining portion may be found as usual
+
+Example 3. — Prepare a detailed estimate of a motor garage from the given drawings, plan
+and section (Fig. 3-3). Adopt suitable rates. General Specifications are as follows:—
+
+Foundation and Plinth — First class brickwork in I: 6 cement sand mortar over lime
+s<ncrete. 2 cm damp proof course at the plinth level.
