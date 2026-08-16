@@ -1,0 +1,403 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  STUDENT
+  STAFF
+  ADMIN
+}
+
+enum RequestStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  COMPLETED
+  CANCELLED
+}
+
+enum RequestPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum WorkflowStepType {
+  APPROVAL
+  TASK
+  CONDITION
+  DOCUMENT_GENERATION
+  NOTIFY
+}
+
+enum StepAssigneeType {
+  DEPARTMENT
+  ROLE
+  REQUESTER
+  SYSTEM
+}
+
+enum TransitionAction {
+  START
+  APPROVE
+  REJECT
+  COMPLETE
+  CLEAR
+  OUTSTANDING
+  ESCALATE
+}
+
+enum TaskStatus {
+  OPEN
+  COMPLETED
+  CANCELLED
+}
+
+enum TaskKind {
+  APPROVAL
+  ACTION
+}
+
+enum AssetStatus {
+  PURCHASED
+  IN_STOCK
+  ASSIGNED
+  TRANSFERRED
+  MAINTENANCE
+  RETIRED
+}
+
+enum NotificationType {
+  REQUEST_SUBMITTED
+  APPROVAL_ASSIGNED
+  REQUEST_APPROVED
+  REQUEST_REJECTED
+  SLA_WARNING
+  SLA_BREACHED
+  TASK_ASSIGNED
+  DOCUMENT_READY
+  ESCALATED
+  GENERIC
+}
+
+model Counter {
+  key   String @id
+  value Int    @default(0)
+}
+
+model Department {
+  id        String   @id @default(uuid())
+  code      String   @unique
+  name      String
+  headId    String?
+  head      User?    @relation("DepartmentHead", fields: [headId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members      User[]           @relation("UserDepartment")
+  steps        WorkflowStep[]
+  requests     Request[]
+  assets       Asset[]
+}
+
+model User {
+  id           String    @id @default(uuid())
+  name         String
+  email        String    @unique
+  passwordHash String
+  role         UserRole  @default(STUDENT)
+  departmentId String?
+  department   Department? @relation("UserDepartment", fields: [departmentId], references: [id], onDelete: SetNull)
+  studentId    String?
+  staffTitle   String?
+  profileImage String?
+  timezone     String    @default("UTC")
+  language     String    @default("en")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  headedDepartments Department[] @relation("DepartmentHead")
+  sessions          Session[]
+  requests          Request[]    @relation("RequestedBy")
+  assignedRequests  Request[]    @relation("AssignedOfficer")
+  approvingRequests Request[]    @relation("CurrentApprover")
+  tasks             Task[]
+  approvals         Approval[]
+  notifications     Notification[]
+  auditLogs         AuditLog[]
+  assets            Asset[]      @relation("AssetAssignee")
+  uploadedFiles     Attachment[]
+
+  @@index([email])
+  @@index([role])
+  @@index([departmentId])
+}
+
+model Session {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
+  expiresAt DateTime
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Workflow {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  steps        WorkflowStep[]
+  transitions  WorkflowTransition[]
+  requestTypes RequestType[]
+}
+
+model WorkflowStep {
+  id           String            @id @default(uuid())
+  workflowId   String
+  workflow     Workflow          @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  key          String
+  name         String
+  type         WorkflowStepType
+  assigneeType StepAssigneeType
+  departmentId String?
+  department   Department?       @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  assigneeRole UserRole?
+  slaHours     Int?
+  sortOrder    Int
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  outgoing   WorkflowTransition[] @relation("FromStep")
+  incoming   WorkflowTransition[] @relation("ToStep")
+  requests   Request[]
+  tasks      Task[]
+  approvals  Approval[]
+
+  @@unique([workflowId, key])
+  @@index([workflowId, sortOrder])
+}
+
+model WorkflowTransition {
+  id         String           @id @default(uuid())
+  workflowId String
+  workflow   Workflow         @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  fromStepId String?
+  fromStep   WorkflowStep?    @relation("FromStep", fields: [fromStepId], references: [id], onDelete: Cascade)
+  toStepId   String?
+  toStep     WorkflowStep?    @relation("ToStep", fields: [toStepId], references: [id], onDelete: SetNull)
+  action     TransitionAction
+  toStatus   RequestStatus?
+  createdAt  DateTime         @default(now())
+
+  @@index([workflowId])
+  @@index([fromStepId, action])
+}
+
+model RequestType {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  name        String
+  description String?
+  workflowId  String
+  workflow    Workflow @relation(fields: [workflowId], references: [id], onDelete: Restrict)
+  slaHours    Int      @default(48)
+  formSchema  Json?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  requests Request[]
+}
+
+model Request {
+  id                String          @id @default(uuid())
+  number            String          @unique
+  typeId            String
+  type              RequestType     @relation(fields: [typeId], references: [id])
+  status            RequestStatus   @default(DRAFT)
+  priority          RequestPriority @default(NORMAL)
+  requesterId       String
+  requester         User            @relation("RequestedBy", fields: [requesterId], references: [id], onDelete: Cascade)
+  departmentId      String?
+  department        Department?     @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  assignedOfficerId String?
+  assignedOfficer   User?           @relation("AssignedOfficer", fields: [assignedOfficerId], references: [id], onDelete: SetNull)
+  currentApproverId String?
+  currentApprover   User?           @relation("CurrentApprover", fields: [currentApproverId], references: [id], onDelete: SetNull)
+  currentStepId     String?
+  currentStep       WorkflowStep?   @relation(fields: [currentStepId], references: [id], onDelete: SetNull)
+  formData          Json
+  dueAt             DateTime?
+  slaWarnedAt       DateTime?
+  slaBreachedAt     DateTime?
+  submittedAt       DateTime?
+  completedAt       DateTime?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  events      RequestEvent[]
+  tasks       Task[]
+  approvals   Approval[]
+  attachments Attachment[]
+
+  @@index([requesterId])
+  @@index([status])
+  @@index([typeId])
+  @@index([currentApproverId])
+  @@index([assignedOfficerId])
+  @@index([dueAt])
+  @@index([createdAt])
+}
+
+model RequestEvent {
+  id         String   @id @default(uuid())
+  requestId  String
+  request    Request  @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  actorId    String?
+  action     String
+  message    String
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([requestId, createdAt])
+}
+
+model Task {
+  id          String     @id @default(uuid())
+  requestId   String
+  request     Request    @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  stepId      String?
+  step        WorkflowStep? @relation(fields: [stepId], references: [id], onDelete: SetNull)
+  assigneeId  String
+  assignee    User       @relation(fields: [assigneeId], references: [id], onDelete: Cascade)
+  kind        TaskKind
+  title       String
+  status      TaskStatus @default(OPEN)
+  dueAt       DateTime?
+  comment     String?
+  completedAt DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  approvals Approval[]
+
+  @@index([assigneeId, status])
+  @@index([requestId])
+  @@index([dueAt])
+}
+
+model Approval {
+  id         String           @id @default(uuid())
+  requestId  String
+  request    Request          @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  taskId     String?
+  task       Task?            @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  stepId     String?
+  step       WorkflowStep?    @relation(fields: [stepId], references: [id], onDelete: SetNull)
+  actorId    String
+  actor      User             @relation(fields: [actorId], references: [id], onDelete: Cascade)
+  decision   TransitionAction
+  comment    String?
+  createdAt  DateTime         @default(now())
+
+  @@index([requestId])
+  @@index([actorId])
+}
+
+model Attachment {
+  id           String   @id @default(uuid())
+  requestId    String
+  request      Request  @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  uploadedById String?
+  uploadedBy   User?    @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+  filename     String
+  mimeType     String
+  sizeBytes    Int
+  storagePath  String
+  generated    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  @@index([requestId])
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType
+  title     String
+  body      String?
+  link      String?
+  read      Boolean          @default(false)
+  metadata  Json?
+  createdAt DateTime         @default(now())
+
+  @@index([userId, read])
+  @@index([createdAt])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action    String
+  resource  String?
+  metadata  Json?
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+model Asset {
+  id           String      @id @default(uuid())
+  tag          String      @unique
+  name         String
+  category     String
+  status       AssetStatus @default(PURCHASED)
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  assigneeId   String?
+  assignee     User?       @relation("AssetAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  notes        String?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  events AssetEvent[]
+
+  @@index([status])
+  @@index([departmentId])
+}
+
+model AssetEvent {
+  id        String      @id @default(uuid())
+  assetId   String
+  asset     Asset       @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  actorId   String?
+  fromStatus AssetStatus?
+  toStatus  AssetStatus
+  notes     String?
+  createdAt DateTime    @default(now())
+
+  @@index([assetId, createdAt])
+}
