@@ -4,6 +4,7 @@ on:
   push:
     branches: [main, develop]
   pull_request:
+  workflow_dispatch:
 
 jobs:
   api:
@@ -11,11 +12,11 @@ jobs:
     env:
       DATABASE_URL: postgresql://nexora:nexora@localhost:5432/nexora
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
-      - run: npm install
+      - run: npm ci
       - run: npx prisma generate
       - run: npm run typecheck
