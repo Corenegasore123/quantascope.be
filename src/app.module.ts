@@ -4,58 +4,46 @@ import { PrismaModule } from "./prisma/prisma.module";
 import { AuthGuard } from "./common/auth.guard";
 import { RolesGuard } from "./common/roles.guard";
 import { RedisService } from "./common/redis.service";
-import { StorageService } from "./common/storage.service";
 import { AuthService } from "./modules/auth/auth.service";
 import { AuthController } from "./modules/auth/auth.controller";
 import { AuditService } from "./modules/audit/audit.service";
-import { NotificationsService } from "./modules/notifications/notifications.service";
-import { WorkflowEngine } from "./modules/workflows/engine.service";
-import { RequestsService } from "./modules/requests/requests.service";
-import { RequestsController } from "./modules/requests/requests.controller";
-import { TasksController } from "./modules/tasks/tasks.controller";
-import { WorkflowsController } from "./modules/workflows/workflows.controller";
-import { UsersController } from "./modules/users/users.controller";
-import { DepartmentsController, RequestTypesController } from "./modules/org/org.controller";
-import { AssetsController } from "./modules/assets/assets.controller";
-import { ReportsController, SearchController, AuditController } from "./modules/reports/reports.controller";
-import {
-  NotificationsController,
-  ConsentController,
-  AssistantController,
-} from "./modules/misc/misc.controller";
+import { StorageService } from "./common/storage.service";
 import { HealthController } from "./modules/health/health.controller";
-import { SlaScheduler } from "./modules/jobs/sla.scheduler";
-import { DocumentsController } from "./modules/documents/documents.controller";
+import { RestaurantController } from "./modules/restaurant/restaurant.controller";
+import { RestaurantService } from "./modules/restaurant/restaurant.service";
+import { ConsentController } from "./modules/misc/consent.controller";
+import { EcosystemService } from "./modules/ecosystem/ecosystem.service";
+import { DiscoverController, OnboardingController, PlatformController } from "./modules/ecosystem/ecosystem.controller";
+import { PublicController } from "./modules/public/public.controller";
+import { PublicService } from "./modules/public/public.service";
+import { RecommendationService } from "./modules/public/recommendation.service";
+import { ReviewsService } from "./modules/reviews/reviews.service";
+import { CustomerReviewsController, PlatformReviewsController } from "./modules/reviews/reviews.controller";
 
 @Module({
   imports: [PrismaModule],
   controllers: [
     HealthController,
     AuthController,
-    RequestsController,
-    TasksController,
-    WorkflowsController,
-    UsersController,
-    DepartmentsController,
-    RequestTypesController,
-    AssetsController,
-    ReportsController,
-    SearchController,
-    AuditController,
-    NotificationsController,
+    RestaurantController,
     ConsentController,
-    AssistantController,
-    DocumentsController,
+    PlatformController,
+    OnboardingController,
+    DiscoverController,
+    PublicController,
+    CustomerReviewsController,
+    PlatformReviewsController,
   ],
   providers: [
     RedisService,
-    StorageService,
     AuthService,
     AuditService,
-    NotificationsService,
-    WorkflowEngine,
-    RequestsService,
-    SlaScheduler,
+    RestaurantService,
+    StorageService,
+    EcosystemService,
+    PublicService,
+    RecommendationService,
+    ReviewsService,
     { provide: APP_GUARD, useClass: AuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
   ],

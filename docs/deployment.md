@@ -1,6 +1,6 @@
 # Deployment
 
-Nexora Campus is four managed services. None of them need GPUs or native CV libraries.
+Nexora is four managed services.
 
 ```
 Frontend (Next.js)     → Vercel
@@ -64,6 +64,5 @@ docker compose exec api npx tsx prisma/seed.ts
 ## Production notes
 
 - Uploads currently use disk (`STORAGE_PATH`). Swap in S3/R2 behind `StorageService` before running multiple API instances.
-- SLA checks run every 60 seconds.
 - API documentation is served at `/api/docs`.
 - Health: `GET /health`. Readiness: `GET /api/ready`.

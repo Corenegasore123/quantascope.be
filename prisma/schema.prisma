@@ -8,85 +8,117 @@ datasource db {
 }
 
 enum UserRole {
+  PLATFORM_ADMIN
+  OWNER
+  ADMIN
+  MANAGER
+  CASHIER
+  WAITER
+  CHEF
+  KITCHEN
+  INVENTORY_MANAGER
+  ACCOUNTANT
+  CUSTOMER
   STUDENT
   STAFF
-  ADMIN
 }
 
-enum RequestStatus {
+enum RestaurantStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+}
+
+enum AccountStatus {
+  INVITED
+  ACTIVE
+}
+
+enum TableStatus {
+  AVAILABLE
+  OCCUPIED
+  RESERVED
+  CLEANING
+}
+
+enum ReservationStatus {
+  NEW
+  PENDING
+  CONFIRMED
+  ARRIVED
+  SEATED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum OrderStatus {
+  OPEN
+  SENT
+  PREPARING
+  READY
+  SERVED
+  PAID
+  CANCELLED
+}
+
+enum KitchenTicketStatus {
+  NEW
+  PREPARING
+  READY
+  SERVED
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  MOBILE_MONEY
+}
+
+enum WasteReason {
+  EXPIRED
+  OVERPRODUCTION
+  DAMAGED
+  PREPARATION_ERROR
+  CUSTOMER_RETURN
+  UNKNOWN
+}
+
+enum PurchaseOrderStatus {
   DRAFT
-  SUBMITTED
-  UNDER_REVIEW
   PENDING_APPROVAL
   APPROVED
-  REJECTED
-  COMPLETED
+  SENT
+  RECEIVED
   CANCELLED
 }
 
-enum RequestPriority {
-  LOW
-  NORMAL
-  HIGH
-  URGENT
+enum AttendanceStatus {
+  PRESENT
+  LATE
+  ABSENT
 }
 
-enum WorkflowStepType {
-  APPROVAL
-  TASK
-  CONDITION
-  DOCUMENT_GENERATION
-  NOTIFY
+enum LoyaltyTier {
+  BRONZE
+  SILVER
+  GOLD
 }
 
-enum StepAssigneeType {
-  DEPARTMENT
-  ROLE
-  REQUESTER
-  SYSTEM
+enum MenuClassification {
+  STAR
+  PLOW_HORSE
+  PUZZLE
+  DOG
 }
 
-enum TransitionAction {
-  START
-  APPROVE
-  REJECT
-  COMPLETE
-  CLEAR
-  OUTSTANDING
-  ESCALATE
-}
-
-enum TaskStatus {
-  OPEN
-  COMPLETED
-  CANCELLED
-}
-
-enum TaskKind {
-  APPROVAL
-  ACTION
-}
-
-enum AssetStatus {
-  PURCHASED
-  IN_STOCK
+enum DeliveryStatus {
+  QUEUED
   ASSIGNED
-  TRANSFERRED
-  MAINTENANCE
-  RETIRED
-}
-
-enum NotificationType {
-  REQUEST_SUBMITTED
-  APPROVAL_ASSIGNED
-  REQUEST_APPROVED
-  REQUEST_REJECTED
-  SLA_WARNING
-  SLA_BREACHED
-  TASK_ASSIGNED
-  DOCUMENT_READY
-  ESCALATED
-  GENERIC
+  PICKED_UP
+  ON_THE_WAY
+  DELIVERED
+  CANCELLED
 }
 
 model Counter {
@@ -94,52 +126,172 @@ model Counter {
   value Int    @default(0)
 }
 
-model Department {
-  id        String   @id @default(uuid())
-  code      String   @unique
-  name      String
-  headId    String?
-  head      User?    @relation("DepartmentHead", fields: [headId], references: [id], onDelete: SetNull)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+model City {
+  id     String @id @default(uuid())
+  slug   String @unique
+  name   String
+  region String @default("Rwanda")
+}
 
-  members      User[]           @relation("UserDepartment")
-  steps        WorkflowStep[]
-  requests     Request[]
-  assets       Asset[]
+model Restaurant {
+  id              String           @id @default(uuid())
+  slug            String           @unique
+  name            String
+  description     String           @default("")
+  logoUrl         String?
+  coverUrl        String?
+  phone           String           @default("")
+  email           String           @default("")
+  website         String           @default("")
+  address         String           @default("")
+  city            String           @default("Kigali")
+  neighborhood    String           @default("")
+  country         String           @default("Rwanda")
+  cuisine         String           @default("Rwandan")
+  priceTier       String           @default("$$")
+  features        String           @default("")
+  featuredTags    String           @default("")
+  currency        String           @default("RWF")
+  timezone        String           @default("Africa/Kigali")
+  taxRate         Float            @default(18)
+  openingHours    Json
+  paymentMethods  String           @default("CASH,CARD,MOBILE_MONEY")
+  notificationsOn Boolean          @default(true)
+  rating          Float            @default(0)
+  ratingFood      Float            @default(0)
+  ratingService   Float            @default(0)
+  ratingAmbience  Float            @default(0)
+  reviewCount     Int              @default(0)
+  status          RestaurantStatus @default(PENDING)
+  publishedAt     DateTime?
+  ownerId         String?          @unique
+  owner           User?            @relation("RestaurantOwner", fields: [ownerId], references: [id])
+  branches        Branch[]
+  users           User[]           @relation("RestaurantStaff")
+  reviews         Review[]
+  images          RestaurantImage[]
+  menuCategories  MenuCategory[]
+  favorites       Favorite[]
+  createdAt       DateTime         @default(now())
+
+  @@index([status, city])
+  @@index([rating])
+  @@index([createdAt])
+  @@index([neighborhood])
+}
+
+model RestaurantImage {
+  id           String     @id @default(uuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  url          String
+  alt          String     @default("")
+  sort         Int        @default(0)
+}
+
+model Branch {
+  id             String        @id @default(uuid())
+  restaurantId   String?
+  restaurant     Restaurant?   @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  code           String
+  name           String
+  city           String
+  neighborhood   String        @default("")
+  address        String
+  lat            Float?
+  lng            Float?
+  isPrimary      Boolean       @default(false)
+  users          User[]
+  tables         DiningTable[]
+  reservations   Reservation[]
+  orders         Order[]
+  waste          WasteEntry[]
+  purchaseOrders PurchaseOrder[]
+  shifts         Shift[]
+  attendance     Attendance[]
+  createdAt      DateTime      @default(now())
+  @@unique([restaurantId, code])
 }
 
 model User {
-  id           String    @id @default(uuid())
-  name         String
-  email        String    @unique
-  passwordHash String
-  role         UserRole  @default(STUDENT)
-  departmentId String?
-  department   Department? @relation("UserDepartment", fields: [departmentId], references: [id], onDelete: SetNull)
-  studentId    String?
-  staffTitle   String?
-  profileImage String?
-  timezone     String    @default("UTC")
-  language     String    @default("en")
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id                 String        @id @default(uuid())
+  name               String
+  email              String        @unique
+  phone              String?
+  passwordHash       String
+  role               UserRole
+  accountStatus      AccountStatus @default(ACTIVE)
+  mustChangePassword Boolean       @default(false)
+  restaurantId       String?
+  restaurant         Restaurant?   @relation("RestaurantStaff", fields: [restaurantId], references: [id])
+  ownedRestaurant    Restaurant?   @relation("RestaurantOwner")
+  branchId           String?
+  branch             Branch?       @relation(fields: [branchId], references: [id])
+  title              String?
+  profileImage       String?
+  timezone           String        @default("Africa/Kigali")
+  language           String        @default("en")
+  createdAt          DateTime      @default(now())
+  sessions           Session[]
+  ordersWaited       Order[]       @relation("WaiterOrders")
+  shifts             Shift[]
+  attendance         Attendance[]
+  auditLogs          AuditLog[]
+  notifications      Notification[]
+  customerProfile    Customer?
+  favorites          Favorite[]
+}
 
-  headedDepartments Department[] @relation("DepartmentHead")
-  sessions          Session[]
-  requests          Request[]    @relation("RequestedBy")
-  assignedRequests  Request[]    @relation("AssignedOfficer")
-  approvingRequests Request[]    @relation("CurrentApprover")
-  tasks             Task[]
-  approvals         Approval[]
-  notifications     Notification[]
-  auditLogs         AuditLog[]
-  assets            Asset[]      @relation("AssetAssignee")
-  uploadedFiles     Attachment[]
+model Favorite {
+  id           String     @id @default(uuid())
+  userId       String
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now())
 
-  @@index([email])
-  @@index([role])
-  @@index([departmentId])
+  @@unique([userId, restaurantId])
+  @@index([userId])
+  @@index([restaurantId])
+}
+
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model Review {
+  id            String       @id @default(uuid())
+  restaurantId  String
+  restaurant    Restaurant   @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  customerId    String?
+  customer      Customer?    @relation(fields: [customerId], references: [id])
+  reservationId String?      @unique
+  reservation   Reservation? @relation(fields: [reservationId], references: [id])
+  author        String
+  rating        Int
+  food          Int
+  service       Int
+  ambience      Int
+  comment       String       @default("")
+  status        ReviewStatus @default(PENDING)
+  rejectReason  String?
+  images        ReviewImage[]
+  createdAt     DateTime     @default(now())
+  moderatedAt   DateTime?
+
+  @@index([restaurantId, status])
+  @@index([customerId])
+}
+
+model ReviewImage {
+  id       String @id @default(uuid())
+  reviewId String
+  review   Review @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  url      String
+  alt      String @default("")
+  sort     Int    @default(0)
 }
 
 model Session {
@@ -151,253 +303,272 @@ model Session {
   ipAddress String?
   userAgent String?
   createdAt DateTime @default(now())
-
-  @@index([userId])
-  @@index([expiresAt])
 }
 
-model Workflow {
-  id          String   @id @default(uuid())
+model DiningTable {
+  id           String        @id @default(uuid())
+  branchId     String
+  branch       Branch        @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  code         String
+  seats        Int
+  status       TableStatus   @default(AVAILABLE)
+  posX         Int           @default(0)
+  posY         Int           @default(0)
+  reservations Reservation[]
+  orders       Order[]
+  @@unique([branchId, code])
+}
+
+model Customer {
+  id          String         @id @default(uuid())
+  userId      String?        @unique
+  user        User?          @relation(fields: [userId], references: [id])
   name        String
-  description String?
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  steps        WorkflowStep[]
-  transitions  WorkflowTransition[]
-  requestTypes RequestType[]
+  phone       String?
+  email       String?
+  visits      Int            @default(0)
+  totalSpent  Int            @default(0)
+  favorite    String?
+  loyalty     LoyaltyTier    @default(BRONZE)
+  points      Int            @default(0)
+  lastVisit   DateTime?
+  reservations Reservation[]
+  orders      Order[]
+  feedback    Feedback[]
+  reviews     Review[]
+  createdAt   DateTime       @default(now())
 }
 
-model WorkflowStep {
-  id           String            @id @default(uuid())
-  workflowId   String
-  workflow     Workflow          @relation(fields: [workflowId], references: [id], onDelete: Cascade)
-  key          String
+model Reservation {
+  id         String             @id @default(uuid())
+  number     String             @unique
+  customerId String
+  customer   Customer           @relation(fields: [customerId], references: [id])
+  branchId   String
+  branch     Branch             @relation(fields: [branchId], references: [id])
+  tableId    String?
+  table      DiningTable?       @relation(fields: [tableId], references: [id])
+  guests     Int
+  date       DateTime
+  time       String
+  preference String?
+  status     ReservationStatus  @default(PENDING)
+  review     Review?
+  createdAt  DateTime           @default(now())
+
+  @@index([branchId, date, status])
+  @@index([date, status])
+}
+
+model MenuCategory {
+  id           String      @id @default(uuid())
+  restaurantId String?
+  restaurant   Restaurant? @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   name         String
-  type         WorkflowStepType
-  assigneeType StepAssigneeType
-  departmentId String?
-  department   Department?       @relation(fields: [departmentId], references: [id], onDelete: SetNull)
-  assigneeRole UserRole?
-  slaHours     Int?
-  sortOrder    Int
-  createdAt    DateTime          @default(now())
-  updatedAt    DateTime          @updatedAt
-
-  outgoing   WorkflowTransition[] @relation("FromStep")
-  incoming   WorkflowTransition[] @relation("ToStep")
-  requests   Request[]
-  tasks      Task[]
-  approvals  Approval[]
-
-  @@unique([workflowId, key])
-  @@index([workflowId, sortOrder])
+  items        MenuItem[]
 }
 
-model WorkflowTransition {
-  id         String           @id @default(uuid())
-  workflowId String
-  workflow   Workflow         @relation(fields: [workflowId], references: [id], onDelete: Cascade)
-  fromStepId String?
-  fromStep   WorkflowStep?    @relation("FromStep", fields: [fromStepId], references: [id], onDelete: Cascade)
-  toStepId   String?
-  toStep     WorkflowStep?    @relation("ToStep", fields: [toStepId], references: [id], onDelete: SetNull)
-  action     TransitionAction
-  toStatus   RequestStatus?
-  createdAt  DateTime         @default(now())
-
-  @@index([workflowId])
-  @@index([fromStepId, action])
+model MenuItem {
+  id             String             @id @default(uuid())
+  categoryId     String
+  category       MenuCategory       @relation(fields: [categoryId], references: [id])
+  name           String
+  description    String             @default("")
+  imageUrl       String?
+  dietary        String             @default("")
+  popular        Boolean            @default(false)
+  price          Int
+  ingredientCost Int                @default(0)
+  classification MenuClassification @default(PUZZLE)
+  active         Boolean            @default(true)
+  recipe         RecipeLine[]
+  orderLines     OrderLine[]
 }
 
-model RequestType {
-  id          String   @id @default(uuid())
-  code        String   @unique
-  name        String
-  description String?
-  workflowId  String
-  workflow    Workflow @relation(fields: [workflowId], references: [id], onDelete: Restrict)
-  slaHours    Int      @default(48)
-  formSchema  Json?
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  requests Request[]
+model Ingredient {
+  id           String          @id @default(uuid())
+  restaurantId String?
+  name         String
+  unit         String
+  stock        Float
+  minStock     Float
+  costPerUnit  Int
+  supplierId   String?
+  supplier     Supplier?       @relation(fields: [supplierId], references: [id])
+  recipe       RecipeLine[]
+  waste        WasteEntry[]
+  poLines      PurchaseLine[]
 }
 
-model Request {
-  id                String          @id @default(uuid())
-  number            String          @unique
-  typeId            String
-  type              RequestType     @relation(fields: [typeId], references: [id])
-  status            RequestStatus   @default(DRAFT)
-  priority          RequestPriority @default(NORMAL)
-  requesterId       String
-  requester         User            @relation("RequestedBy", fields: [requesterId], references: [id], onDelete: Cascade)
-  departmentId      String?
-  department        Department?     @relation(fields: [departmentId], references: [id], onDelete: SetNull)
-  assignedOfficerId String?
-  assignedOfficer   User?           @relation("AssignedOfficer", fields: [assignedOfficerId], references: [id], onDelete: SetNull)
-  currentApproverId String?
-  currentApprover   User?           @relation("CurrentApprover", fields: [currentApproverId], references: [id], onDelete: SetNull)
-  currentStepId     String?
-  currentStep       WorkflowStep?   @relation(fields: [currentStepId], references: [id], onDelete: SetNull)
-  formData          Json
-  dueAt             DateTime?
-  slaWarnedAt       DateTime?
-  slaBreachedAt     DateTime?
-  submittedAt       DateTime?
-  completedAt       DateTime?
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
-
-  events      RequestEvent[]
-  tasks       Task[]
-  approvals   Approval[]
-  attachments Attachment[]
-
-  @@index([requesterId])
-  @@index([status])
-  @@index([typeId])
-  @@index([currentApproverId])
-  @@index([assignedOfficerId])
-  @@index([dueAt])
-  @@index([createdAt])
+model RecipeLine {
+  id           String     @id @default(uuid())
+  menuItemId   String
+  menuItem     MenuItem   @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  ingredientId String
+  ingredient   Ingredient @relation(fields: [ingredientId], references: [id])
+  quantity     Float
 }
 
-model RequestEvent {
+model Order {
+  id           String      @id @default(uuid())
+  number       String      @unique
+  branchId     String
+  branch       Branch      @relation(fields: [branchId], references: [id])
+  tableId      String?
+  table        DiningTable? @relation(fields: [tableId], references: [id])
+  customerId   String?
+  customer     Customer?   @relation(fields: [customerId], references: [id])
+  waiterId     String?
+  waiter       User?       @relation("WaiterOrders", fields: [waiterId], references: [id])
+  status       OrderStatus @default(OPEN)
+  subtotal     Int         @default(0)
+  tax          Int         @default(0)
+  discount     Int         @default(0)
+  total        Int         @default(0)
+  notes        String?
+  lines        OrderLine[]
+  tickets      KitchenTicket[]
+  payments     Payment[]
+  feedback     Feedback?
+  delivery     Delivery?
+  createdAt    DateTime    @default(now())
+  paidAt       DateTime?
+}
+
+model OrderLine {
   id         String   @id @default(uuid())
-  requestId  String
-  request    Request  @relation(fields: [requestId], references: [id], onDelete: Cascade)
-  actorId    String?
-  action     String
-  message    String
-  metadata   Json?
-  createdAt  DateTime @default(now())
-
-  @@index([requestId, createdAt])
+  orderId    String
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuItemId String
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id])
+  quantity   Int
+  unitPrice  Int
+  notes      String?
 }
 
-model Task {
-  id          String     @id @default(uuid())
-  requestId   String
-  request     Request    @relation(fields: [requestId], references: [id], onDelete: Cascade)
-  stepId      String?
-  step        WorkflowStep? @relation(fields: [stepId], references: [id], onDelete: SetNull)
-  assigneeId  String
-  assignee    User       @relation(fields: [assigneeId], references: [id], onDelete: Cascade)
-  kind        TaskKind
-  title       String
-  status      TaskStatus @default(OPEN)
-  dueAt       DateTime?
-  comment     String?
-  completedAt DateTime?
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-
-  approvals Approval[]
-
-  @@index([assigneeId, status])
-  @@index([requestId])
-  @@index([dueAt])
+model KitchenTicket {
+  id        String              @id @default(uuid())
+  orderId   String
+  order     Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  status    KitchenTicketStatus @default(NEW)
+  startedAt DateTime?
+  readyAt   DateTime?
+  createdAt DateTime            @default(now())
 }
 
-model Approval {
-  id         String           @id @default(uuid())
-  requestId  String
-  request    Request          @relation(fields: [requestId], references: [id], onDelete: Cascade)
-  taskId     String?
-  task       Task?            @relation(fields: [taskId], references: [id], onDelete: SetNull)
-  stepId     String?
-  step       WorkflowStep?    @relation(fields: [stepId], references: [id], onDelete: SetNull)
-  actorId    String
-  actor      User             @relation(fields: [actorId], references: [id], onDelete: Cascade)
-  decision   TransitionAction
-  comment    String?
-  createdAt  DateTime         @default(now())
-
-  @@index([requestId])
-  @@index([actorId])
+model Payment {
+  id        String        @id @default(uuid())
+  orderId   String
+  order     Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  method    PaymentMethod
+  amount    Int
+  createdAt DateTime      @default(now())
 }
 
-model Attachment {
-  id           String   @id @default(uuid())
-  requestId    String
-  request      Request  @relation(fields: [requestId], references: [id], onDelete: Cascade)
-  uploadedById String?
-  uploadedBy   User?    @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
-  filename     String
-  mimeType     String
-  sizeBytes    Int
-  storagePath  String
-  generated    Boolean  @default(false)
-  createdAt    DateTime @default(now())
+model WasteEntry {
+  id           String      @id @default(uuid())
+  branchId     String
+  branch       Branch      @relation(fields: [branchId], references: [id])
+  ingredientId String
+  ingredient   Ingredient  @relation(fields: [ingredientId], references: [id])
+  quantity     Float
+  reason       WasteReason
+  cost         Int
+  createdAt    DateTime    @default(now())
+}
 
-  @@index([requestId])
+model Supplier {
+  id           String          @id @default(uuid())
+  name         String
+  onTimeRate   Float           @default(0.9)
+  qualityScore Float           @default(0.9)
+  avgDelayHours Float          @default(2)
+  ingredients  Ingredient[]
+  purchaseOrders PurchaseOrder[]
+}
+
+model PurchaseOrder {
+  id         String               @id @default(uuid())
+  number     String               @unique
+  branchId   String
+  branch     Branch               @relation(fields: [branchId], references: [id])
+  supplierId String
+  supplier   Supplier             @relation(fields: [supplierId], references: [id])
+  status     PurchaseOrderStatus  @default(DRAFT)
+  total      Int                  @default(0)
+  lines      PurchaseLine[]
+  createdAt  DateTime             @default(now())
+}
+
+model PurchaseLine {
+  id           String        @id @default(uuid())
+  purchaseId   String
+  purchase     PurchaseOrder @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  ingredientId String
+  ingredient   Ingredient    @relation(fields: [ingredientId], references: [id])
+  quantity     Float
+  unitCost     Int
+}
+
+model Shift {
+  id        String   @id @default(uuid())
+  branchId  String
+  branch    Branch   @relation(fields: [branchId], references: [id])
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  name      String
+  startsAt  String
+  endsAt    String
+}
+
+model Attendance {
+  id        String           @id @default(uuid())
+  branchId  String
+  branch    Branch           @relation(fields: [branchId], references: [id])
+  userId    String
+  user      User             @relation(fields: [userId], references: [id])
+  date      DateTime
+  status    AttendanceStatus
+}
+
+model Feedback {
+  id        String   @id @default(uuid())
+  orderId   String   @unique
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  customerId String?
+  customer  Customer? @relation(fields: [customerId], references: [id])
+  food      Int
+  service   Int
+  ambience  Int
+  comment   String?
+  createdAt DateTime @default(now())
+}
+
+model Delivery {
+  id        String         @id @default(uuid())
+  orderId   String         @unique
+  order     Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  driver    String?
+  status    DeliveryStatus @default(QUEUED)
+  createdAt DateTime       @default(now())
 }
 
 model Notification {
-  id        String           @id @default(uuid())
+  id        String   @id @default(uuid())
   userId    String
-  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  type      NotificationType
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   title     String
-  body      String?
-  link      String?
-  read      Boolean          @default(false)
-  metadata  Json?
-  createdAt DateTime         @default(now())
-
-  @@index([userId, read])
-  @@index([createdAt])
+  body      String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
 }
 
 model AuditLog {
   id        String   @id @default(uuid())
   userId    String?
-  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  user      User?    @relation(fields: [userId], references: [id])
   action    String
-  resource  String?
-  metadata  Json?
+  resource  String
   ipAddress String?
   createdAt DateTime @default(now())
-
-  @@index([userId])
-  @@index([action])
-  @@index([createdAt])
-}
-
-model Asset {
-  id           String      @id @default(uuid())
-  tag          String      @unique
-  name         String
-  category     String
-  status       AssetStatus @default(PURCHASED)
-  departmentId String?
-  department   Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
-  assigneeId   String?
-  assignee     User?       @relation("AssetAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
-  notes        String?
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
-
-  events AssetEvent[]
-
-  @@index([status])
-  @@index([departmentId])
-}
-
-model AssetEvent {
-  id        String      @id @default(uuid())
-  assetId   String
-  asset     Asset       @relation(fields: [assetId], references: [id], onDelete: Cascade)
-  actorId   String?
-  fromStatus AssetStatus?
-  toStatus  AssetStatus
-  notes     String?
-  createdAt DateTime    @default(now())
-
-  @@index([assetId, createdAt])
 }

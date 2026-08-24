@@ -7,11 +7,7 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "types": ["node"],
-    "declaration": false,
-    "emitDecoratorMetadata": true,
-    "experimentalDecorators": true,
-    "outDir": "./dist",
-    "rootDir": "."
+    "noEmit": true
   },
-  "include": ["src/**/*.ts", "prisma/**/*.ts"]
+  "include": ["./**/*.ts"]
 }

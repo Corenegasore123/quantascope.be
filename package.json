@@ -2,7 +2,7 @@
   "name": "nexora-api",
   "version": "1.0.0",
   "private": true,
-  "description": "Nexora Campus NestJS API",
+  "description": "Nexora restaurant operations API",
   "scripts": {
     "start:dev": "nest start --watch --preserveWatchOutput",
     "start": "node dist/main.js",

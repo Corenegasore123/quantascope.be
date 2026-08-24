@@ -26,10 +26,8 @@ async function bootstrap() {
   app.setGlobalPrefix("api", { exclude: ["health"] });
 
   const swagger = new DocumentBuilder()
-    .setTitle("Nexora Campus API")
-    .setDescription(
-      "REST API for university requests, configurable workflows, approvals, SLA tracking, assets, and audit."
-    )
+    .setTitle("Nexora API")
+    .setDescription("Restaurant operations platform: reservations, tables, POS, kitchen, inventory, staff, and analytics.")
     .setVersion("1.0.0")
     .addCookieAuth("nexora_session")
     .build();

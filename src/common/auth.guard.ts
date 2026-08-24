@@ -30,6 +30,13 @@ export class AuthGuard implements CanActivate {
     const user = await this.auth.findUserBySessionToken(token);
     if (!user) throw new AppError(401, "Session expired", "SESSION_EXPIRED");
     req.user = user;
+    if (user.mustChangePassword) {
+      const path = req.path.split("?")[0];
+      const allowed = new Set(["/api/auth/change-password", "/api/auth/logout", "/api/auth/me", "/api/auth/check"]);
+      if (!allowed.has(path)) {
+        throw new AppError(403, "You must change your temporary password", "MUST_CHANGE_PASSWORD");
+      }
+    }
     return true;
   }
 }

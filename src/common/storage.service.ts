@@ -9,6 +9,10 @@ export class StorageService {
     return path.isAbsolute(configured) ? configured : path.resolve(process.cwd(), configured);
   }
 
+  pathFor(subdir: string, filename: string) {
+    return path.join(this.root(), subdir, filename);
+  }
+
   async save(subdir: string, filename: string, data: Buffer): Promise<string> {
     const dir = path.join(this.root(), subdir);
     await mkdir(dir, { recursive: true });
