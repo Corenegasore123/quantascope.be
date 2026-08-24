@@ -18,6 +18,43 @@ import { resolveDishImage } from "../../shared/dish-photos";
 const ACTIVE = { status: "ACTIVE" as const };
 const HELD: ReservationStatus[] = ["NEW", "PENDING", "CONFIRMED", "ARRIVED", "SEATED"];
 
+function numericField(row: object, key: string) {
+  const value = (row as Record<string, unknown>)[key];
+  return typeof value === "number" ? value : 0;
+}
+
+type ProfileReview = {
+  id: string;
+  author: string;
+  rating: number;
+  food: number;
+  service: number;
+  ambience: number;
+  comment: string;
+  createdAt: Date;
+  images: { url: string; alt: string }[];
+};
+
+function loadApprovedReviews(db: PrismaService, restaurantId: string) {
+  return (
+    db as unknown as {
+      review: {
+        findMany: (args: {
+          where: { restaurantId: string; status: "APPROVED" };
+          include: { images: true };
+          orderBy: { createdAt: "desc" };
+          take: number;
+        }) => Promise<ProfileReview[]>;
+      };
+    }
+  ).review.findMany({
+    where: { restaurantId, status: "APPROVED" },
+    include: { images: true },
+    orderBy: { createdAt: "desc" },
+    take: 8,
+  });
+}
+
 export type ListQuery = {
   city?: string;
   q?: string;
@@ -212,16 +249,19 @@ export class PublicService {
       include: {
         images: { orderBy: { sort: "asc" } },
         branches: { orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }] },
-        reviews: { where: { status: "APPROVED" }, orderBy: { createdAt: "desc" }, take: 8, include: { images: true } },
       },
     });
     if (!restaurant) throw new AppError(404, "Restaurant not found", "NOT_FOUND");
-    const menu = await this.prisma.menuItem.findMany({
-      where: { active: true, category: { restaurantId: restaurant.id } },
-      include: { category: true },
-      orderBy: [{ popular: "desc" }, { name: "asc" }],
-    });
-    const [card] = await this.decorate([restaurant]);
+    const [menu, approvedReviews, cards] = await Promise.all([
+      this.prisma.menuItem.findMany({
+        where: { active: true, category: { restaurantId: restaurant.id } },
+        include: { category: true },
+        orderBy: [{ popular: "desc" }, { name: "asc" }],
+      }),
+      loadApprovedReviews(this.prisma, restaurant.id),
+      this.decorate([restaurant]),
+    ]);
+    const card = cards[0];
     const hours = parseHours(restaurant.openingHours);
     const primary = restaurant.branches[0];
     const publicMenu = menu.map(
@@ -253,10 +293,10 @@ export class PublicService {
         lat: b.lat,
         lng: b.lng,
       })),
-      ratingFood: restaurant.ratingFood,
-      ratingService: restaurant.ratingService,
-      ratingAmbience: restaurant.ratingAmbience,
-      reviews: restaurant.reviews.map((r) => ({
+      ratingFood: card.ratingFood,
+      ratingService: card.ratingService,
+      ratingAmbience: card.ratingAmbience,
+      reviews: approvedReviews.map((r) => ({
         id: r.id,
         author: r.author,
         rating: r.rating,
@@ -390,9 +430,9 @@ export class PublicService {
         cuisine: r.cuisine,
         priceTier: r.priceTier,
         rating: r.rating,
-        ratingFood: r.ratingFood,
-        ratingService: r.ratingService,
-        ratingAmbience: r.ratingAmbience,
+        ratingFood: numericField(r, "ratingFood"),
+        ratingService: numericField(r, "ratingService"),
+        ratingAmbience: numericField(r, "ratingAmbience"),
         reviewCount: r.reviewCount,
         coverUrl: r.coverUrl ?? r.images[0]?.url ?? null,
         tags: splitTags(r.features),

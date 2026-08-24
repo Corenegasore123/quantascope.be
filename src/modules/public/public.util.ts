@@ -45,6 +45,9 @@ export type PublicCard = {
   cuisine: string;
   priceTier: string;
   rating: number;
+  ratingFood: number;
+  ratingService: number;
+  ratingAmbience: number;
   reviewCount: number;
   coverUrl: string | null;
   tags: string[];
