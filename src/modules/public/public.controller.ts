@@ -57,7 +57,7 @@ export class PublicController {
   @Public()
   @Get("home")
   home(@Query("city") city?: string) {
-    return this.pub.home(city || "Kigali");
+    return this.pub.home(city?.trim() || undefined);
   }
 
   @Public()

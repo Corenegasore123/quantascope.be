@@ -127,16 +127,18 @@ export class PublicService {
     };
   }
 
-  async home(city = "Kigali") {
-    const cards = await this.decorate(await this.loadActive({ city }));
+  async home(city?: string) {
+    const scope = city?.trim() || undefined;
+    const cards = await this.decorate(await this.loadActive(scope ? { city: scope } : {}));
     const ranked = this.recs.rank(cards);
     const tonight = cards.filter((c) => c.nextSlots.some((s) => s.available > 0));
     const cuisineGroups = this.groupCuisines(cards);
+    const label = scope ?? "Rwanda";
     return {
-      city,
+      city: label,
       demo: true,
       rails: [
-        { id: "popular", title: `Popular in ${city}`, items: ranked.slice(0, 8) },
+        { id: "popular", title: `Popular in ${label}`, items: ranked.slice(0, 8) },
         { id: "tonight", title: "Available tonight", items: tonight.slice(0, 8) },
         { id: "rated", title: "Highly rated", items: [...cards].sort((a, b) => b.rating - a.rating).slice(0, 8) },
         { id: "new", title: "New on Nexora", items: [...cards].sort((a, b) => (b.publishedAt ?? "").localeCompare(a.publishedAt ?? "")).slice(0, 8) },
