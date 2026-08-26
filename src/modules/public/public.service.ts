@@ -17,6 +17,17 @@ import { resolveDishImage } from "../../shared/dish-photos";
 
 const ACTIVE = { status: "ACTIVE" as const };
 const HELD: ReservationStatus[] = ["NEW", "PENDING", "CONFIRMED", "ARRIVED", "SEATED"];
+const KIGALI_DISTRICTS = new Set(["gasabo", "kicukiro", "nyarugenge"]);
+
+function restaurantCityKey(placeName: string) {
+  const key = placeName.trim().toLowerCase();
+  if (key === "kigali" || KIGALI_DISTRICTS.has(key)) return "kigali";
+  return key;
+}
+
+function restaurantMatchesPlace(restaurantCity: string, placeName: string) {
+  return restaurantCity.trim().toLowerCase() === restaurantCityKey(placeName);
+}
 
 function numericField(row: object, key: string) {
   const value = (row as Record<string, unknown>)[key];
@@ -86,8 +97,8 @@ export class PublicService {
       where: ACTIVE,
       select: { city: true, coverUrl: true, cuisine: true, neighborhood: true },
     });
-    return cities.map((city) => {
-      const inCity = restaurants.filter((r) => r.city.toLowerCase() === city.name.toLowerCase());
+    const rows = cities.map((city) => {
+      const inCity = restaurants.filter((r) => restaurantMatchesPlace(r.city, city.name));
       const cuisines = [...new Set(inCity.map((r) => r.cuisine.split(/[•,]/)[0].trim()).filter(Boolean))].slice(0, 5);
       const neighborhoods = [...new Set(inCity.map((r) => r.neighborhood).filter(Boolean))].slice(0, 6);
       return {
@@ -98,8 +109,10 @@ export class PublicService {
         coverUrl: inCity.find((r) => r.coverUrl)?.coverUrl ?? null,
         cuisines,
         neighborhoods,
+        featured: inCity.length > 0 && !KIGALI_DISTRICTS.has(city.name.toLowerCase()),
       };
     });
+    return rows.sort((a, b) => b.restaurantCount - a.restaurantCount || a.name.localeCompare(b.name));
   }
 
   async cityPage(slug: string) {
@@ -107,7 +120,9 @@ export class PublicService {
       where: { slug: { equals: slug, mode: "insensitive" } },
     });
     if (!city) throw new AppError(404, "City not found", "NOT_FOUND");
-    const cards = await this.decorate(await this.loadActive({ city: city.name }));
+    const filterCity =
+      restaurantCityKey(city.name) === "kigali" ? "Kigali" : city.name;
+    const cards = await this.decorate(await this.loadActive({ city: filterCity }));
     const neighborhoods = [...new Map(
       cards
         .filter((c) => c.neighborhood)
