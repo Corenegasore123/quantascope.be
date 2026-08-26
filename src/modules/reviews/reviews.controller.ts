@@ -6,14 +6,10 @@ import {
   Param,
   Post,
   Query,
-  UploadedFiles,
-  UseInterceptors,
 } from "@nestjs/common";
-import { FilesInterceptor } from "@nestjs/platform-express";
-import { memoryStorage } from "multer";
 import { ApiTags } from "@nestjs/swagger";
 import type { User } from "@prisma/client";
-import { CurrentUser, Public, Roles } from "../../common/decorators";
+import { CurrentUser, Roles } from "../../common/decorators";
 import { ReviewsService } from "./reviews.service";
 import { dinerReviewSchema, rejectReviewSchema } from "../../shared/validation";
 
@@ -34,26 +30,9 @@ export class CustomerReviewsController {
   }
 
   @Post()
-  @UseInterceptors(
-    FilesInterceptor("photos", 4, {
-      storage: memoryStorage(),
-      limits: { fileSize: 5 * 1024 * 1024 },
-    })
-  )
-  create(
-    @CurrentUser() user: User,
-    @Body() body: Record<string, string>,
-    @UploadedFiles() files: Express.Multer.File[]
-  ) {
-    const input = dinerReviewSchema.parse({
-      reservationId: body.reservationId,
-      rating: Number(body.rating),
-      food: Number(body.food),
-      service: Number(body.service),
-      ambience: Number(body.ambience),
-      comment: body.comment,
-    });
-    return this.reviews.create(user, input, files ?? []);
+  create(@CurrentUser() user: User, @Body() body: unknown) {
+    const input = dinerReviewSchema.parse(body);
+    return this.reviews.create(user, input);
   }
 }
 

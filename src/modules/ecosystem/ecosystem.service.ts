@@ -336,27 +336,7 @@ export class EcosystemService {
     const name = (user?.role === "CUSTOMER" ? user.name : input.name)?.trim();
     if (!name) throw new AppError(400, "Guest name is required", "BAD_INPUT");
     const email = (user?.role === "CUSTOMER" ? user.email : input.email)?.trim().toLowerCase() || undefined;
-    const phone = (user?.role === "CUSTOMER" ? user.phone : input.phone)?.trim() || input.phone?.trim() || undefined;
-
-    const day = new Date(input.date);
-    day.setHours(0, 0, 0, 0);
-    const next = new Date(day);
-    next.setDate(next.getDate() + 1);
-    const tables = await this.prisma.diningTable.findMany({
-      where: { branchId: branch.id },
-      orderBy: { seats: "asc" },
-    });
-    const taken = await this.prisma.reservation.findMany({
-      where: {
-        branchId: branch.id,
-        time: input.time,
-        date: { gte: day, lt: next },
-        status: { in: ["NEW", "PENDING", "CONFIRMED", "ARRIVED", "SEATED"] },
-      },
-    });
-    const takenIds = new Set(taken.map((r) => r.tableId).filter(Boolean));
-    const table = tables.find((t) => t.seats >= input.guests && !takenIds.has(t.id));
-    if (!table) throw new AppError(409, "No tables available at that time", "NO_AVAILABILITY");
+    let phone = (user?.role === "CUSTOMER" ? user.phone : input.phone)?.trim() || input.phone?.trim() || undefined;
 
     let customer =
       user?.role === "CUSTOMER"
@@ -378,15 +358,60 @@ export class EcosystemService {
       }
     }
     if (!customer) {
-      customer = await this.prisma.customer.create({
-        data: {
-          name,
-          email: email || null,
-          phone,
-          userId: user?.role === "CUSTOMER" ? user.id : undefined,
-        },
-      });
+      try {
+        customer = await this.prisma.customer.create({
+          data: {
+            name,
+            email: email || null,
+            phone,
+            userId: user?.role === "CUSTOMER" ? user.id : undefined,
+          },
+        });
+      } catch {
+        if (user?.role === "CUSTOMER") {
+          customer = await this.prisma.customer.findUnique({ where: { userId: user.id } });
+        }
+        if (!customer && email) {
+          customer = await this.prisma.customer.findFirst({
+            where: { email: { equals: email, mode: "insensitive" } },
+          });
+        }
+        if (!customer) throw new AppError(500, "Could not create diner profile", "CUSTOMER_CREATE_FAILED");
+      }
     }
+    if (user?.role === "CUSTOMER") {
+      phone = phone || customer.phone || undefined;
+      if ((!customer.phone && phone) || customer.name !== name || (email && customer.email !== email)) {
+        customer = await this.prisma.customer.update({
+          where: { id: customer.id },
+          data: {
+            name,
+            email: email || customer.email,
+            phone: phone || customer.phone,
+          },
+        });
+      }
+    }
+
+    const day = new Date(input.date);
+    day.setHours(0, 0, 0, 0);
+    const next = new Date(day);
+    next.setDate(next.getDate() + 1);
+    const tables = await this.prisma.diningTable.findMany({
+      where: { branchId: branch.id },
+      orderBy: { seats: "asc" },
+    });
+    const taken = await this.prisma.reservation.findMany({
+      where: {
+        branchId: branch.id,
+        time: input.time,
+        date: { gte: day, lt: next },
+        status: { in: ["NEW", "PENDING", "CONFIRMED", "ARRIVED", "SEATED"] },
+      },
+    });
+    const takenIds = new Set(taken.map((r) => r.tableId).filter(Boolean));
+    const table = tables.find((t) => t.seats >= input.guests && !takenIds.has(t.id));
+    if (!table) throw new AppError(409, "No tables available at that time", "NO_AVAILABILITY");
 
     const number = await this.ops.nextNumber("reservation", "RES-");
     const reservation = await this.prisma.reservation.create({

@@ -3,8 +3,6 @@ import { Prisma, ReviewStatus } from "@prisma/client";
 import type { User } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { AppError } from "../../common/app-error";
-import { StorageService } from "../../common/storage.service";
-import { assertRestaurantDishPhoto } from "../../common/menu-photo";
 import { RestaurantService } from "../restaurant/restaurant.service";
 
 const APPROVED: ReviewStatus = "APPROVED";
@@ -13,7 +11,6 @@ const APPROVED: ReviewStatus = "APPROVED";
 export class ReviewsService {
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
-    @Inject(StorageService) private readonly storage: StorageService,
     @Inject(RestaurantService) private readonly ops: RestaurantService
   ) {}
 
@@ -140,8 +137,7 @@ export class ReviewsService {
 
   async create(
     user: User,
-    input: { reservationId: string; rating: number; food: number; service: number; ambience: number; comment?: string },
-    files: Express.Multer.File[]
+    input: { reservationId: string; rating: number; food: number; service: number; ambience: number; comment?: string }
   ) {
     await this.ops.completeElapsedReservations();
     const customer = await this.dinerCustomer(user);
@@ -176,24 +172,7 @@ export class ReviewsService {
         include: { images: true, restaurant: { select: { id: true, slug: true, name: true, coverUrl: true } } },
       });
 
-      const images = [];
-      for (const [i, file] of (files ?? []).entries()) {
-        if (!file?.buffer?.length) continue;
-        assertRestaurantDishPhoto(file);
-        const filename = `${review.id}-${i}.jpg`;
-        await this.storage.save("reviews", filename, file.buffer);
-        const row = await this.prisma.reviewImage.create({
-          data: {
-            reviewId: review.id,
-            url: `/api/public/media/reviews/${filename}`,
-            alt: "",
-            sort: i,
-          },
-        });
-        images.push(row);
-      }
-
-      return this.mapReview({ ...review, images }, true);
+      return this.mapReview(review, true);
     } catch (err) {
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
         throw new AppError(409, "This visit already has a review", "REVIEW_EXISTS");
