@@ -18,6 +18,7 @@ import { resolveDishImage } from "../../shared/dish-photos";
 const ACTIVE = { status: "ACTIVE" as const };
 const HELD: ReservationStatus[] = ["NEW", "PENDING", "CONFIRMED", "ARRIVED", "SEATED"];
 const KIGALI_DISTRICTS = new Set(["gasabo", "kicukiro", "nyarugenge"]);
+const KIGALI_METRO_NAMES = ["Kigali", "Gasabo", "Kicukiro", "Nyarugenge"];
 
 function restaurantCityKey(placeName: string) {
   const key = placeName.trim().toLowerCase();
@@ -25,8 +26,22 @@ function restaurantCityKey(placeName: string) {
   return key;
 }
 
+function isKigaliMetroPlace(placeName: string) {
+  return restaurantCityKey(placeName) === "kigali";
+}
+
+/** Exact district match, or whole Kigali metro when the place is "Kigali". */
 function restaurantMatchesPlace(restaurantCity: string, placeName: string) {
-  return restaurantCity.trim().toLowerCase() === restaurantCityKey(placeName);
+  const restaurantKey = restaurantCity.trim().toLowerCase();
+  const placeKey = placeName.trim().toLowerCase();
+  if (placeKey === "kigali") {
+    return restaurantKey === "kigali" || KIGALI_DISTRICTS.has(restaurantKey);
+  }
+  if (KIGALI_DISTRICTS.has(placeKey)) {
+    // District pages/cards: count venues stored under that district or the metro label.
+    return restaurantKey === placeKey || restaurantKey === "kigali";
+  }
+  return restaurantKey === placeKey;
 }
 
 function numericField(row: object, key: string) {
@@ -339,7 +354,18 @@ export class PublicService {
 
   private async loadActive(query: Pick<ListQuery, "city" | "q" | "cuisine" | "neighborhood" | "price" | "rating" | "feature">) {
     const AND: Prisma.RestaurantWhereInput[] = [{ ...ACTIVE }];
-    if (query.city) AND.push({ city: { contains: query.city, mode: "insensitive" } });
+    if (query.city) {
+      if (isKigaliMetroPlace(query.city) && query.city.trim().toLowerCase() === "kigali") {
+        // Where=Kigali groups every City of Kigali district.
+        AND.push({
+          OR: KIGALI_METRO_NAMES.map((name) => ({
+            city: { equals: name, mode: "insensitive" as const },
+          })),
+        });
+      } else {
+        AND.push({ city: { contains: query.city, mode: "insensitive" } });
+      }
+    }
     if (query.cuisine) AND.push({ cuisine: { contains: query.cuisine, mode: "insensitive" } });
     if (query.neighborhood) AND.push({ neighborhood: { contains: query.neighborhood, mode: "insensitive" } });
     if (query.price) AND.push({ priceTier: query.price });
